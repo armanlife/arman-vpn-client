@@ -137,6 +137,11 @@ class MainActivity : FlutterActivity() {
                     CoreService.setShowSpeed(this, call.argument<Boolean>("on") == true)
                     result.success(null)
                 }
+                "routingEnabled" -> result.success(CoreService.routingEnabled(this))
+                "setRoutingEnabled" -> {
+                    CoreService.setRoutingEnabled(this, call.argument<Boolean>("on") == true)
+                    result.success(null)
+                }
                 "setConnectionMode" -> {
                     val mode = call.argument<String>("mode") ?: CoreService.MODE_VPN
                     // A running proxy switched to the VPN needs the permission

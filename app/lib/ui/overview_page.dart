@@ -15,6 +15,7 @@ import '../core/ports.dart';
 import '../l10n/app_localizations.dart';
 import '../platform.dart';
 import 'browser_signin.dart';
+import 'bypass_apps_page.dart';
 import 'connection_mode.dart';
 import 'format.dart';
 import 'port_dialog.dart';
@@ -713,6 +714,7 @@ class _ModeSwitch extends StatelessWidget {
     required this.modes,
     required this.selected,
     required this.onSelected,
+    this.onTapSelected,
   });
 
   final _HomePalette palette;
@@ -722,6 +724,9 @@ class _ModeSwitch extends StatelessWidget {
 
   /// Null while a change is under way.
   final ValueChanged<String>? onSelected;
+
+  /// Called when the already-chosen mode is tapped (e.g. to open its settings).
+  final ValueChanged<String>? onTapSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -736,7 +741,11 @@ class _ModeSwitch extends StatelessWidget {
       final color = chosen ? p.text : p.muted;
       Widget child = InkWell(
         customBorder: const StadiumBorder(),
-        onTap: onSelected == null || chosen ? null : () => onSelected(m.value),
+        onTap: onSelected == null
+            ? null
+            : chosen
+                ? (onTapSelected != null ? () => onTapSelected!(m.value) : null)
+                : () => onSelected(m.value),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
@@ -1071,6 +1080,43 @@ class _PhoneHome extends StatelessWidget {
     if (!on) _testAfterPowerOn(core);
   }
 
+  void _openBypassApps(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const BypassAppsPage(),
+      ),
+    ).then((_) async {
+      try {
+        final r = await AndroidCore.appRouting();
+        AndroidCore.appRoutingMode.value =
+            (r.onlyChosen || r.bypass.isNotEmpty) ? 'selected' : 'all';
+        AndroidCore.selectedAppsCount.value = r.chosenCount;
+      } catch (_) {}
+    });
+  }
+
+  Future<void> _openPortSettings(
+    BuildContext context,
+    CoreStatus status,
+  ) async {
+    final port = await showPortDialog(
+      context,
+      taken: status.state.address,
+    );
+    if (port != null && context.mounted) {
+      await runShowingErrors(
+        context,
+        () => core.setProxyPort(port),
+      );
+    }
+  }
+
+  void _openAllAppsSettings() {
+    if (onOpenConnection != null) {
+      onOpenConnection!();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final base = Theme.of(context);
@@ -1369,6 +1415,276 @@ class _PhoneHome extends StatelessWidget {
                 Center(child: _LanChip(port: portOf(proxy.listen) ?? 10810)),
               ],
               const Spacer(),
+              if (Platform.isAndroid) ...[
+                ListenableBuilder(
+                  listenable: Listenable.merge([
+                    AndroidCore.mode,
+                    AndroidCore.appRoutingMode,
+                    AndroidCore.selectedAppsCount,
+                  ]),
+                  builder: (context, _) {
+                    final mode = AndroidCore.mode.value;
+                    final routing = AndroidCore.appRoutingMode.value;
+                    final selected = mode == 'proxy' ? 'proxy' : routing;
+                    final isFa =
+                        Localizations.localeOf(context).languageCode == 'fa';
+                    final port = portOf(proxy?.listen ?? '') ??
+                        portOf(status.state.address) ??
+                        10810;
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Center(
+                          child: _ModeSwitch(
+                            palette: p,
+                            accent: accent,
+                            selected: selected,
+                            onSelected: core.switchingProxy
+                                ? null
+                                : (newMode) async {
+                                    if (newMode == 'proxy') {
+                                      await runShowingErrors(
+                                        context,
+                                        () => AndroidCore.setMode('proxy'),
+                                      );
+                                    } else if (newMode == 'selected') {
+                                      if (AndroidCore.mode.value != 'vpn') {
+                                        await runShowingErrors(
+                                          context,
+                                          () => AndroidCore.setMode('vpn'),
+                                        );
+                                      }
+                                      await AndroidCore.setRoutingEnabled(true);
+                                      AndroidCore.appRoutingMode.value =
+                                          'selected';
+                                      try {
+                                        final r =
+                                            await AndroidCore.appRouting();
+                                        AndroidCore.selectedAppsCount.value =
+                                            r.chosenCount;
+                                      } catch (_) {}
+                                    } else if (newMode == 'all') {
+                                      if (AndroidCore.mode.value != 'vpn') {
+                                        await runShowingErrors(
+                                          context,
+                                          () => AndroidCore.setMode('vpn'),
+                                        );
+                                      }
+                                      await AndroidCore.setRoutingEnabled(
+                                        false,
+                                      );
+                                      AndroidCore.appRoutingMode.value = 'all';
+                                    }
+                                  },
+                            onTapSelected: (modeValue) {
+                              if (modeValue == 'proxy') {
+                                _openPortSettings(context, status);
+                              } else if (modeValue == 'all') {
+                                _openAllAppsSettings();
+                              }
+                            },
+                            modes: [
+                              (
+                                value: 'all',
+                                icon: Icons.public_rounded,
+                                label: isFa ? 'تمام برنامه‌ها' : 'All apps',
+                                tooltip: isFa
+                                    ? 'عبور تمام برنامه‌ها از VPN'
+                                    : 'All apps go through VPN',
+                              ),
+                              (
+                                value: 'selected',
+                                icon: Icons.apps_rounded,
+                                label:
+                                    isFa ? 'برنامه‌های انتخابی' : 'Selected apps',
+                                tooltip: isFa
+                                    ? 'فقط برنامه‌های انتخاب‌شده'
+                                    : 'Only selected apps',
+                              ),
+                              (
+                                value: 'proxy',
+                                icon: Icons.settings_ethernet_rounded,
+                                label: l.modeProxy,
+                                tooltip: '${l.proxyPort}: $port',
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (selected == 'proxy')
+                          Center(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => _openPortSettings(context, status),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
+                                decoration: ShapeDecoration(
+                                  color: p.card,
+                                  shape: StadiumBorder(
+                                    side: BorderSide(color: p.cardBorder),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.tune_rounded,
+                                      size: 14,
+                                      color: accent,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      isFa
+                                          ? 'پورت پروکسی: $port'
+                                          : 'Proxy port: $port',
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color: p.text,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Icon(
+                                      Icons.edit_outlined,
+                                      size: 13,
+                                      color: p.muted,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        else if (selected == 'selected')
+                          Center(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => _openBypassApps(context),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
+                                decoration: ShapeDecoration(
+                                  color: p.card,
+                                  shape: StadiumBorder(
+                                    side: BorderSide(color: p.cardBorder),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.apps_rounded,
+                                      size: 14,
+                                      color: accent,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      isFa
+                                          ? 'برنامه‌های انتخاب‌شده  ${AndroidCore.selectedAppsCount.value}'
+                                          : 'Selected apps  ${AndroidCore.selectedAppsCount.value}',
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color: p.text,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.chevron_left_rounded,
+                                      size: 16,
+                                      color: p.muted,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Center(
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: _openAllAppsSettings,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                child: Text(
+                                  isFa
+                                      ? 'کل ترافیک گوشی از VPN عبور می‌کند.'
+                                      : 'All apps go through the VPN.',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: p.muted,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                ),
+              ] else if (status.systemProxySupported || status.tunSupported) ...[
+                Center(
+                  child: _ModeSwitch(
+                    palette: p,
+                    accent: accent,
+                    selected: connectionModeShown(status),
+                    onSelected: core.switchingProxy || core.installingTun
+                        ? null
+                        : (mode) => chooseConnectionMode(context, core, mode),
+                    modes: [
+                      (
+                        value: 'clear',
+                        icon: Icons.settings_ethernet_rounded,
+                        label: l.modeProxy,
+                        tooltip: running && proxy != null
+                            ? '${l.proxyServiceActive} · ${proxy.listen}'
+                            : '',
+                      ),
+                      if (status.systemProxySupported)
+                        (
+                          value: 'set',
+                          icon: Icons.computer_rounded,
+                          label: l.systemProxy,
+                          tooltip: '',
+                        ),
+                      if (status.tunSupported)
+                        (
+                          value: 'tun',
+                          icon: Icons.vpn_lock_rounded,
+                          label: l.modeTun,
+                          tooltip: '',
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  connectionModeHint(
+                    l,
+                    status,
+                    installing: core.installingTun,
+                    windows: defaultTargetPlatform == TargetPlatform.windows,
+                  ),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(color: p.muted),
+                ),
+                TunNote(
+                  core: core,
+                  box: (text, tooltip) => _ProblemBox(
+                    text: text,
+                    color: StatusColors.busy,
+                    icon: Icons.warning_amber_rounded,
+                    tooltip: tooltip,
+                  ),
+                ),
+              ],
               SizedBox(height: short ? 12 : 20),
               _UpdateNotice(core: core, settings: settings, palette: p),
               _UdpNotice(status: status, settings: settings, palette: p),
@@ -1380,42 +1696,31 @@ class _PhoneHome extends StatelessWidget {
                 connected: connected,
                 palette: p,
               ),
-              if (short)
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Expanded(
-                        child: _PlaceCard(
-                          palette: p,
-                          place: place,
-                          accent: accent,
-                          onTap: onOpenServers,
-                          compact: true,
-                        ),
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _PlaceCard(
+                        palette: p,
+                        place: place,
+                        accent: accent,
+                        onTap: onOpenServers,
+                        compact: true,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _HomeData(
-                          status: status,
-                          palette: p,
-                          onTap: onOpenAccounts,
-                          compact: true,
-                        ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _HomeData(
+                        status: status,
+                        palette: p,
+                        onTap: onOpenAccounts,
+                        compact: true,
                       ),
-                    ],
-                  ),
-                )
-              else ...[
-                _PlaceCard(
-                  palette: p,
-                  place: place,
-                  accent: accent,
-                  onTap: onOpenServers,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                _HomeData(status: status, palette: p, onTap: onOpenAccounts),
-              ],
+              ),
             ],
           ),
         ),

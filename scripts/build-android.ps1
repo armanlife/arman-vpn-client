@@ -17,6 +17,9 @@ $version = $match.Matches[0].Groups[1].Value
 $out = "$root\dist\Arman-VPN-$version-android"
 
 if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk" }
+if (-not (Get-Command flutter -ErrorAction SilentlyContinue) -and (Test-Path "C:\src\flutter\bin")) {
+    $env:PATH = "C:\src\flutter\bin;$env:PATH"
+}
 $ndk = (Select-String -Path "$root\app\android\app\build.gradle.kts" -Pattern 'ndkVersion\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
 if (-not $env:ANDROID_NDK_HOME) { $env:ANDROID_NDK_HOME = "$env:ANDROID_HOME\ndk\$ndk" }
 if (-not $env:JAVA_HOME) { $env:JAVA_HOME = "$env:ProgramFiles\Android\Android Studio\jbr" }
