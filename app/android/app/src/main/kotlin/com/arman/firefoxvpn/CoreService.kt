@@ -102,7 +102,7 @@ class CoreService : VpnService() {
                 shownSpeed = speed
                 getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(code))
             }
-            if (on && usesVpn(this@CoreService) && appMode(this@CoreService) == MODE_EXCLUDE) {
+            if (on && usesVpn(this@CoreService) && routingEnabled(this@CoreService) && appMode(this@CoreService) == MODE_EXCLUDE) {
                 checkSuggested()
             }
             // The speed changes all the time: shown, it is read more often.
@@ -318,6 +318,10 @@ class CoreService : VpnService() {
      * (Bypass selected apps). Apps no longer installed are skipped.
      */
     private fun applyApps(builder: Builder) {
+        if (!routingEnabled(this)) {
+            builder.addDisallowedApplication(packageName)
+            return
+        }
         fun each(packages: Set<String>, add: (String) -> Unit) {
             for (pkg in packages) {
                 try {
@@ -522,6 +526,24 @@ class CoreService : VpnService() {
         fun appMode(context: Context): String = prefs(context).getString(MODE, MODE_EXCLUDE) ?: MODE_EXCLUDE
 
         fun appSet(context: Context, key: String): Set<String> = prefs(context).getStringSet(key, emptySet()) ?: emptySet()
+
+        const val ROUTING_ENABLED = "routing_enabled"
+
+        fun routingEnabled(context: Context): Boolean {
+            val p = prefs(context)
+            if (p.contains(ROUTING_ENABLED)) {
+                return p.getBoolean(ROUTING_ENABLED, false)
+            }
+            return p.getString(MODE, MODE_EXCLUDE) == MODE_INCLUDE ||
+                    (p.getStringSet(BYPASS, emptySet())?.isNotEmpty() == true)
+        }
+
+        fun setRoutingEnabled(context: Context, on: Boolean) {
+            val p = prefs(context)
+            if (p.contains(ROUTING_ENABLED) && p.getBoolean(ROUTING_ENABLED, false) == on) return
+            p.edit().putBoolean(ROUTING_ENABLED, on).apply()
+            reconnect(context)
+        }
 
         /** Keeps the app choice: the mode and the sets. */
         fun setAppRouting(context: Context, mode: String, sets: Map<String, Set<String>>) {

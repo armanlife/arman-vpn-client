@@ -83,6 +83,9 @@ class _BypassAppsPageState extends State<BypassAppsPage> {
         // Applied once: the VPN is set up again with the new choice.
         if (didPop && routing != null && routing.key != _initial) {
           AndroidCore.setAppRouting(routing, apply: true);
+          AndroidCore.setRoutingEnabled(true);
+          AndroidCore.appRoutingMode.value = 'selected';
+          AndroidCore.selectedAppsCount.value = routing.chosenCount;
         }
       },
       child: Scaffold(
