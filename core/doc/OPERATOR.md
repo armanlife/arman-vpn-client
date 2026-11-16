@@ -109,6 +109,10 @@ The dashboard has no HTTPS: its traffic, including passwords typed into it, cros
 
 OpenWrt has no systemd, and `install.sh` needs bash: [docs/OPENWRT.md](../../docs/OPENWRT.md) is the guide for it, in English, for the people who run it. The core runs there from `/root/arman-vpn/` under procd, OpenWrt's service manager, with an init script (`/etc/init.d/arman-vpn`, `-plain`, `respawn`); devices use it as a proxy after `-setup-server`. The releases' amd64, arm64, and armv7 builds are supported (`x86_64`, `aarch64`, and `arm_cortex-a…` routers; armv7 is built with `GOARM=7`, whose hardware floating point the Go runtime checks for at start, and it encrypts in software). MIPS routers rarely have the room for the 14 MB program or the speed for its encryption, so the guide leaves them out (the core still compiles for them).
 
+### Docker
+
+The same core runs in a container. A release tag `vX.Y.Z` publishes the image ([docs/DOCKER.md](../../docs/DOCKER.md)). The container runs `arman-vpn-core -plain -data-dir /var/lib/arman-vpn`, and that folder is the volume (accounts, settings, logs). The first start runs `-setup-server`, which opens the panel and the proxy to the network and prints the logins. The desktop app and the TUN mode are not in the image.
+
 ## Command line
 
 | Command | Effect |

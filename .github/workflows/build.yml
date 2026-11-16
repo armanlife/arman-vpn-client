@@ -5,7 +5,8 @@
 # with the version in its name (Arman-VPN-1.2.3-Android-arm64-v8a.apk),
 # which the release notes and older installed apps use during the update
 # manifest transition. "Run workflow" builds without
-# publishing.
+# publishing. The same tag publishes the container image
+# (.github/workflows/docker.yml): the Linux core, not the desktop app.
 #
 # Secrets for the Android release key (required for a tag):
 #   ANDROID_KEYSTORE_BASE64    the .jks file, base64-encoded

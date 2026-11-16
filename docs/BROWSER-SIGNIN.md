@@ -38,6 +38,7 @@ folder under `accounts` in the data folder:
 | Windows | `user-data` next to the app, usually `%LOCALAPPDATA%\Programs\Arman VPN\user-data` (installs from before the rename: `...\Firefox VPN Client\user-data`); a portable copy keeps it next to its exe |
 | macOS | `~/Library/Application Support/Arman VPN` |
 | Linux | `~/.local/share/arman-vpn`, or `$XDG_DATA_HOME/arman-vpn`; a service started with `-data-dir` uses that folder |
+| Docker | `/var/lib/arman-vpn` in the volume (`docker stop` before copying files in) |
 
 The web panel's Settings page also names the exact data folder of its
 own device.
