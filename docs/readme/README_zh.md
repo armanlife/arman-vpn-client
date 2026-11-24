@@ -1,6 +1,6 @@
 <div align="center">
 
-[🇺🇸 English](../../README.md) &nbsp;/&nbsp; [🇮🇷 فارسی](README_fa.md) &nbsp;/&nbsp; **🇨🇳 简体中文** &nbsp;/&nbsp; [🇷🇺 Русский](README_ru.md)
+[🇺🇸 English](../../README.md) &nbsp;/&nbsp; [🇮🇷 فارسی](README_fa.md) &nbsp;/&nbsp; **🇨🇳 简体中文** &nbsp;/&nbsp; [🇷🇺 Русский](README_ru.md) &nbsp;/&nbsp; [🇯🇵 日本語](README_ja.md)
 
 </div>
 <br>
