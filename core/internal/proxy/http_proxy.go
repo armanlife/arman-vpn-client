@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bufio"
+	"context"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
@@ -147,6 +148,15 @@ func (s *SOCKSServer) openTarget(client net.Conn, target, clientAddr, inbound st
 		reason = "Mozilla's proxy does not connect to port " + port
 	}
 	logx.Debug("upstream tunnel open failed client=%s target=%s err=%s", clientAddr, logx.Target(target), logx.Err(err))
+	if errors.Is(err, context.Canceled) || isNotConnected(err) ||
+		errors.Is(err, errRebuildCoolingDown) || errors.Is(err, ErrNoUsableSession) {
+		// The client gave up waiting (closed its connection), or the
+		// program could not connect to Mozilla, or waits to try again
+		// after a failure: each is logged once where it happened (with a
+		// countdown that changes every second, these would not even
+		// collapse). Nothing more a log reader needs to know.
+		return nil, err
+	}
 	if log, held := s.failures.note(reason); log {
 		more := ""
 		if held > 0 {

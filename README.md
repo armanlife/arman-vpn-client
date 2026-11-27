@@ -172,6 +172,27 @@ The first start prints a panel login and a proxy login. Accounts and settings st
 
 </details>
 
+## Special thanks
+
+Our sincere thanks to **Mozilla** and **Fastly**. Mozilla has always stood for a free, open, and private internet, and Fastly's fast and reliable network reaches people all over the world. This project stands on their work, and we are deeply grateful for it. Neither is involved in this project; see the [disclaimer](#disclaimer).
+
+## Acknowledgements
+
+Arman VPN is built on the work of these open-source projects:
+
+- [Flutter](https://flutter.dev)
+- [Go](https://go.dev)
+- [quic-go](https://github.com/quic-go/quic-go)
+- [uTLS](https://github.com/refraction-networking/utls)
+- [sing-tun](https://github.com/SagerNet/sing-tun)
+- [gVisor](https://gvisor.dev)
+- [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel)
+- [Iran-v2ray-rules](https://github.com/Chocolate4U/Iran-v2ray-rules)
+- [v2ray-rules-dat](https://github.com/Loyalsoldier/v2ray-rules-dat)
+- [iran-hosted-domains](https://github.com/bootmortis/iran-hosted-domains)
+
+Thanks also to everyone who has contributed to this project, by reporting a problem, testing a build, sharing an idea, or helping other users.
+
 ## Disclaimer
 
 This app is an independent, unofficial client, made and maintained by its own developer. It is not a Mozilla product: Mozilla did not make it, does not own, sponsor, or endorse it, and has no part in its development or support. Questions and problems about the app belong in this repository, not with Mozilla.

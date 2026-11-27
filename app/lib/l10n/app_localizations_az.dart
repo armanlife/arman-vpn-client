@@ -701,6 +701,74 @@ class AppLocalizationsAz extends AppLocalizations {
   String get noAnswer => 'Cavab yoxdur';
 
   @override
+  String get dataUsage => 'Məlumat istifadəsi';
+
+  @override
+  String get usageToday => 'Bu gün';
+
+  @override
+  String get usageYesterday => 'Dünən';
+
+  @override
+  String get usageNone => 'Hələ heç nə istifadə olunmayıb.';
+
+  @override
+  String get usageDown => 'Endirmə';
+
+  @override
+  String get usageUp => 'Yükləmə';
+
+  @override
+  String get usageVpn => 'VPN trafiki';
+
+  @override
+  String get usageDirect => 'Birbaşa trafik';
+
+  @override
+  String get usageReset => 'Məlumat istifadəsini sıfırla';
+
+  @override
+  String get usageResetTitle => 'Məlumat istifadəsini sıfırla';
+
+  @override
+  String get usageResetBody =>
+      'Bütün günlərin istifadə statistikası silinəcək və bunu geri qaytarmaq mümkün deyil.';
+
+  @override
+  String get usageResetConfirm => 'Sıfırla';
+
+  @override
+  String get usageTotal => 'Cəmi';
+
+  @override
+  String get usageAll => 'Hamısı';
+
+  @override
+  String get usageWeek => 'Son 7 gün';
+
+  @override
+  String get usageMonth => 'Son 30 gün';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'Səhifə $page / $pages';
+  }
+
+  @override
+  String get usageNewer => 'Daha yeni günlər';
+
+  @override
+  String get usageOlder => 'Daha köhnə günlər';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '$total yerdən $done yoxlanıldı';
+  }
+
+  @override
+  String get stopDelayTest => 'Dayandır';
+
+  @override
   String testedAgo(String ago) {
     return 'Yoxlanıb: $ago';
   }
@@ -1075,7 +1143,7 @@ class AppLocalizationsAz extends AppLocalizations {
   String get showAppModeSwitch => 'Sürətli VPN rejimi dəyişimi';
 
   @override
-  String get liveTraffic => 'Canlı trafik';
+  String get liveTraffic => 'Cari sürət';
 
   @override
   String get totalTraffic => 'Ümumi trafik';

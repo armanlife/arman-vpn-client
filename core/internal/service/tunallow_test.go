@@ -85,7 +85,7 @@ func TestTunnelRefusesDeadEnds(t *testing.T) {
 // The region's app list is read only while routing is on.
 func TestDirectAppsFollowTheRouting(t *testing.T) {
 	d := newTestDaemon(t)
-	if err := writeTestFile(d.paths.RoutingDir, routing.AppListFile("ir"), "cab.snapp.passenger\ncom.digikala\n"); err != nil {
+	if err := writeTestFile(d.paths.RoutingDir, routing.AppListFile("ir"), `{"apps":["cab.snapp.passenger","com.digikala"]}`); err != nil {
 		t.Fatal(err)
 	}
 	d.mu.Lock()

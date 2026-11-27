@@ -1,9 +1,31 @@
 package proxy
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
+
+// NotConnected marks a connection's failure that is the program's own
+// failure to connect to Mozilla. That failure is logged once where it
+// happens, so the many connections waiting on it are not logged again
+// (only at Debug).
+func NotConnected(err error) error {
+	if err == nil {
+		return nil
+	}
+	return notConnectedError{err}
+}
+
+type notConnectedError struct{ err error }
+
+func (e notConnectedError) Error() string { return e.err.Error() }
+func (e notConnectedError) Unwrap() error { return e.err }
+
+func isNotConnected(err error) bool {
+	var nc notConnectedError
+	return errors.As(err, &nc)
+}
 
 // repeatWindow is how long one reason stays collapsed before the log says
 // again that it is still going, with a count.

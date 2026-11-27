@@ -95,6 +95,16 @@ A pass fetched because Mozilla refused the previous one marks its session (`mana
 
 Tests: `TestServerFailingThreeTimesSwitchesToAnotherServerOfItsCity`, `TestServerFailoverCountsTheDialsOfNewPasses`, `TestBrokenSessionsMoveTheServer`, `TestDroppingSessionsMoveTheServer`, `TestRecommendedLocationUsesAStandIn`, `TestFailuresThatAreNotTheServersDoNotSwitch`, `TestEveryServerFailingKeepsTheLocation`, `TestAvoidedServerIsSkippedUntilItsTimeIsUp`, `TestRecommendedLocationFailsOverWithinItself` (`internal/proxy`), `TestWakeMovesToAnotherServerOfTheLocation` and `TestRecommendedFallbackOrder` (`internal/service`).
 
+## Transport fallback
+
+`proxy.transport` is the transport tried first, not the only one: what the user wants is to connect (`internal/proxy/transport.go`). The order is the chosen one, then HTTP/2, then HTTP/1.1 (`TransportOrder`); HTTP/3 only when chosen, since a network that blocks much rarely lets QUIC through and trying it would only add a wait.
+
+- A session that does not open with a transport is opened with the next at once (`NewController`, `dialSession`); a connected transport that fails twice in a row where the server failover counts failures (`failOver`, `transportStrikes`, fewer than `serverFailoverStrikes`) gives way to the next, so another transport is tried before another server. A tunnel that opens clears the count. Only failures that are the server's or the path's count (`serverFault`).
+- HTTP/2 gives way to HTTP/1.1 only when HTTP/2 itself fails: the server does not negotiate it, or the connection breaks the protocol (`http2Failure`). A timeout or an address that does not answer fails HTTP/1.1 the same way, and worse, since it opens a connection per tunnel.
+- The transport that worked stays for the engine's later wakes (`proxyEngine.lastController`, `wakeTransports`) until the network changes (`resetTransport`), when the chosen one is tried first again. The setting is never changed. `GET /status` and the log's `connected to Mozilla` line name the transport in use; a move logs `<transport> did not connect; using <transport> instead`.
+
+Tests: `TestTransportOrder`, `TestTransportAdvance`, `TestTransportStrikes`.
+
 ## H2 and H3 transport contracts
 
 | Property | H2 | H3 |

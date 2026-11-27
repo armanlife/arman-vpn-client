@@ -231,11 +231,11 @@ func (c *Controller) RunRenewalLoop() {
 		}
 		expiry := c.currentExpiry()
 		sleep := c.nextRenewalDelay()
-		logx.Info("proxy pass renewal scheduled next_expiry=%s delay=%s", expiry.Format(time.RFC3339), sleep)
+		logx.Debug("proxy pass renewal scheduled next_expiry=%s delay=%s", expiry.Format(time.RFC3339), sleep)
 		if !c.sleepUntil(time.Now().Round(0).Add(sleep)) {
 			return
 		}
-		logx.Info("proxy pass renewal starting")
+		logx.Debug("proxy pass renewal starting")
 		err, timedOut, late := c.renewWithDeadline(PassRenewTimeout)
 		if timedOut {
 			err = fmt.Errorf("proxy pass renewal timed out after %s: %w", PassRenewTimeout, context.DeadlineExceeded)
@@ -486,13 +486,14 @@ func (c *Controller) replaceSessionLocked(failed *managedSession, cause error) (
 				logx.Info("upstream proxy session redialed with the current proxy pass")
 				// A rebuild counts once against the server: a failed redial
 				// counts (dialSession), else the session it replaced, when
-				// that broke on the server. Past serverFailoverStrikes the
-				// next server of the location replaces the new session too.
+				// that broke on the server. Past transportStrikes the next
+				// transport, past serverFailoverStrikes the next server of
+				// the location, replaces the new session too.
 				if !returned && failed != nil && c.currentServer().Addr == from.Addr && c.failOver(from, cause) {
 					nextErr := c.redialLocked(token, expiresAt)
 					c.redialBackoff.record(now, cause, nextErr)
 					if nextErr != nil {
-						logx.Warn("opening a session on the next server of the location failed; the redialed session serves meanwhile err=%s", logx.Err(nextErr))
+						logx.Warn("opening a session with the next transport or server failed; the redialed session serves meanwhile err=%s", logx.Err(nextErr))
 					}
 				}
 			}
@@ -573,7 +574,11 @@ func (c *Controller) dialSession(token string) (proxySession, error) {
 		c.failOver(next, err)
 		return nil, err
 	}
-	logx.Info("upstream proxy session opened on the next server of the location proxy=%s", next.Addr)
+	if next.Addr != from.Addr {
+		logx.Info("upstream proxy session opened on the next server of the location proxy=%s", next.Addr)
+	} else {
+		logx.Info("upstream proxy session opened with %s proxy=%s", TransportName(c.Transport()), next.Addr)
+	}
 	return session, nil
 }
 
@@ -638,7 +643,9 @@ func (c *Controller) adoptPass(pass *guardian.ProxyPassInfo) error {
 	if err := c.updateCurrentSessionToken(pass.RawToken, pass.ExpiresAt()); err == nil {
 		c.recordRenewalOutcome(nil, time.Time{})
 		c.writeStatus("token_updated")
-		logx.Info("proxy pass renewed successfully next_expiry=%s session=retained", pass.ExpiresAt().Format(time.RFC3339))
+		// Every few minutes while connected: only a failure (Warn) says
+		// something a log reader needs.
+		logx.Debug("proxy pass renewed successfully next_expiry=%s session=retained", pass.ExpiresAt().Format(time.RFC3339))
 		return nil
 	} else {
 		logx.Debug("existing upstream session cannot accept renewed proxy pass; rebuilding err=%s", logx.Err(err))

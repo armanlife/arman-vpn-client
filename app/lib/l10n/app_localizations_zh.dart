@@ -681,6 +681,73 @@ class AppLocalizationsZh extends AppLocalizations {
   String get noAnswer => '无响应';
 
   @override
+  String get dataUsage => '流量统计';
+
+  @override
+  String get usageToday => '今天';
+
+  @override
+  String get usageYesterday => '昨天';
+
+  @override
+  String get usageNone => '尚无使用记录。';
+
+  @override
+  String get usageDown => '下载';
+
+  @override
+  String get usageUp => '上传';
+
+  @override
+  String get usageVpn => 'VPN 流量';
+
+  @override
+  String get usageDirect => '直连流量';
+
+  @override
+  String get usageReset => '重置流量统计';
+
+  @override
+  String get usageResetTitle => '重置流量统计';
+
+  @override
+  String get usageResetBody => '所有日期的流量统计都将被删除，且无法恢复。';
+
+  @override
+  String get usageResetConfirm => '重置';
+
+  @override
+  String get usageTotal => '合计';
+
+  @override
+  String get usageAll => '全部';
+
+  @override
+  String get usageWeek => '最近 7 天';
+
+  @override
+  String get usageMonth => '最近 30 天';
+
+  @override
+  String usagePage(int page, int pages) {
+    return '第 $page 页，共 $pages 页';
+  }
+
+  @override
+  String get usageNewer => '较新的日期';
+
+  @override
+  String get usageOlder => '较早的日期';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '已测试 $done/$total';
+  }
+
+  @override
+  String get stopDelayTest => '停止';
+
+  @override
   String testedAgo(String ago) {
     return '$ago测试';
   }
@@ -1040,7 +1107,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get showAppModeSwitch => '快速切换 VPN 模式';
 
   @override
-  String get liveTraffic => '实时流量';
+  String get liveTraffic => '实时速度';
 
   @override
   String get totalTraffic => '总流量';
@@ -2386,6 +2453,73 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get noAnswer => '無回應';
 
   @override
+  String get dataUsage => '流量統計';
+
+  @override
+  String get usageToday => '今天';
+
+  @override
+  String get usageYesterday => '昨天';
+
+  @override
+  String get usageNone => '尚無使用紀錄。';
+
+  @override
+  String get usageDown => '下載';
+
+  @override
+  String get usageUp => '上傳';
+
+  @override
+  String get usageVpn => 'VPN 流量';
+
+  @override
+  String get usageDirect => '直連流量';
+
+  @override
+  String get usageReset => '重設流量統計';
+
+  @override
+  String get usageResetTitle => '重設流量統計';
+
+  @override
+  String get usageResetBody => '所有日期的流量統計都將被刪除，且無法復原。';
+
+  @override
+  String get usageResetConfirm => '重設';
+
+  @override
+  String get usageTotal => '合計';
+
+  @override
+  String get usageAll => '全部';
+
+  @override
+  String get usageWeek => '最近 7 天';
+
+  @override
+  String get usageMonth => '最近 30 天';
+
+  @override
+  String usagePage(int page, int pages) {
+    return '第 $page 頁，共 $pages 頁';
+  }
+
+  @override
+  String get usageNewer => '較新的日期';
+
+  @override
+  String get usageOlder => '較早的日期';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '已測試 $done/$total';
+  }
+
+  @override
+  String get stopDelayTest => '停止';
+
+  @override
   String testedAgo(String ago) {
     return '測試於 $ago';
   }
@@ -2744,7 +2878,7 @@ class AppLocalizationsZhHant extends AppLocalizationsZh {
   String get showAppModeSwitch => '快速切換 VPN 模式';
 
   @override
-  String get liveTraffic => '即時流量';
+  String get liveTraffic => '即時速度';
 
   @override
   String get totalTraffic => '總流量';

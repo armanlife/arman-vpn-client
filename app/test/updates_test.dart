@@ -112,6 +112,30 @@ void main() {
       expect(mirrorRequests, isEmpty);
     });
 
+    test('Android without a network says so, not only unavailable', () async {
+      // A port nothing listens on: both addresses refuse the connection.
+      final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final closed = 'http://127.0.0.1:${socket.port}';
+      await socket.close();
+      await expectLater(
+        checkForUpdate(
+          server: closed,
+          updatesMirror: '$closed/updates.json',
+          os: 'android',
+          current: '1.0.4',
+        ),
+        throwsA(isA<SocketException>()),
+      );
+    });
+
+    test('Android with an unusable answer is unavailable', () async {
+      final primary = await serve({'GET /updates.json': (503, '')});
+      await expectLater(
+        checkForUpdate(server: primary, os: 'android', current: '1.0.4'),
+        throwsA(isA<HttpException>()),
+      );
+    });
+
     test('the mirror supplies metadata when the primary is unusable', () async {
       for (final response in [
         (503, ''),

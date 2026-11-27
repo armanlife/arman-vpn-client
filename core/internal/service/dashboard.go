@@ -215,6 +215,8 @@ func (s *dashboardServer) handler() http.Handler {
 	mux.HandleFunc("POST /api/retry", s.handleRetry)
 
 	mux.HandleFunc("GET /api/accounts", s.handleAccounts)
+	mux.HandleFunc("GET /api/usage", s.handleUsage)
+	mux.HandleFunc("DELETE /api/usage", s.handleUsageReset)
 	mux.HandleFunc("POST /api/accounts/order", s.handleAccountOrder)
 	mux.HandleFunc("POST /api/accounts/{id}/activate", s.handleAccountActivate)
 	mux.HandleFunc("POST /api/accounts/{id}/enabled", s.handleAccountEnabled)
@@ -238,6 +240,7 @@ func (s *dashboardServer) handler() http.Handler {
 	mux.HandleFunc("PUT /api/settings", s.handleSettingsPut)
 	mux.HandleFunc("GET /api/locations", s.handleLocations)
 	mux.HandleFunc("POST /api/locations/ping", s.handleLocationPing)
+	mux.HandleFunc("GET /api/edges", s.handleEdges)
 	mux.HandleFunc("POST /api/location", s.handleSetLocation)
 	mux.HandleFunc("POST /api/dns/test", s.handleDNSTest)
 	mux.HandleFunc("POST /api/relay/test", s.handleRelayTest)

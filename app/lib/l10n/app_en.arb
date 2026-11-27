@@ -460,6 +460,38 @@
   "testingDelay": "Testing… this can take a minute",
   "search": "Search",
   "noAnswer": "No answer",
+  "dataUsage": "Data usage",
+  "usageToday": "Today",
+  "usageYesterday": "Yesterday",
+  "usageNone": "Nothing used yet.",
+  "usageDown": "Download",
+  "usageUp": "Upload",
+  "usageVpn": "VPN traffic",
+  "usageDirect": "Direct traffic",
+  "usageReset": "Reset data usage",
+  "usageResetTitle": "Reset data usage",
+  "usageResetBody": "All data usage history will be deleted. This cannot be undone.",
+  "usageResetConfirm": "Reset",
+  "usageTotal": "Total",
+  "usageAll": "All",
+  "usageWeek": "Last 7 days",
+  "usageMonth": "Last 30 days",
+  "usagePage": "Page {page} of {pages}",
+  "@usagePage": {"placeholders": {"page": {"type": "int"}, "pages": {"type": "int"}}},
+  "usageNewer": "Newer days",
+  "usageOlder": "Older days",
+  "delayProgress": "{done} of {total} tested",
+  "@delayProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "stopDelayTest": "Stop",
   "testedAgo": "Tested {ago}",
   "@testedAgo": {
     "placeholders": {
@@ -624,7 +656,7 @@
   "showPublicIp": "Show the public IP",
   "speedInNotification": "Show speed in the notification",
   "showAppModeSwitch": "Quick VPN mode switch",
-  "liveTraffic": "Live traffic",
+  "liveTraffic": "Current speed",
   "totalTraffic": "Total traffic",
   "verboseLogs": "Detailed logs",
   "webDashboard": "Web dashboard",

@@ -706,6 +706,74 @@ class AppLocalizationsEs extends AppLocalizations {
   String get noAnswer => 'Sin respuesta';
 
   @override
+  String get dataUsage => 'Uso de datos';
+
+  @override
+  String get usageToday => 'Hoy';
+
+  @override
+  String get usageYesterday => 'Ayer';
+
+  @override
+  String get usageNone => 'Todavía no se ha usado nada.';
+
+  @override
+  String get usageDown => 'Descarga';
+
+  @override
+  String get usageUp => 'Subida';
+
+  @override
+  String get usageVpn => 'Tráfico VPN';
+
+  @override
+  String get usageDirect => 'Tráfico directo';
+
+  @override
+  String get usageReset => 'Restablecer el uso de datos';
+
+  @override
+  String get usageResetTitle => 'Restablecer el uso de datos';
+
+  @override
+  String get usageResetBody =>
+      'Se borrarán las estadísticas de uso de todos los días y no se podrá deshacer.';
+
+  @override
+  String get usageResetConfirm => 'Restablecer';
+
+  @override
+  String get usageTotal => 'Total';
+
+  @override
+  String get usageAll => 'Todo';
+
+  @override
+  String get usageWeek => 'Últimos 7 días';
+
+  @override
+  String get usageMonth => 'Últimos 30 días';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'Página $page de $pages';
+  }
+
+  @override
+  String get usageNewer => 'Días más recientes';
+
+  @override
+  String get usageOlder => 'Días anteriores';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '$done de $total probados';
+  }
+
+  @override
+  String get stopDelayTest => 'Detener';
+
+  @override
   String testedAgo(String ago) {
     return 'Probado $ago';
   }
@@ -1082,7 +1150,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get showAppModeSwitch => 'Cambio rápido de modo VPN';
 
   @override
-  String get liveTraffic => 'Tráfico en vivo';
+  String get liveTraffic => 'Velocidad actual';
 
   @override
   String get totalTraffic => 'Tráfico total';

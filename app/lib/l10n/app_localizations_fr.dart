@@ -707,6 +707,74 @@ class AppLocalizationsFr extends AppLocalizations {
   String get noAnswer => 'Pas de réponse';
 
   @override
+  String get dataUsage => 'Consommation de données';
+
+  @override
+  String get usageToday => 'Aujourd\'hui';
+
+  @override
+  String get usageYesterday => 'Hier';
+
+  @override
+  String get usageNone => 'Rien n\'a encore été consommé.';
+
+  @override
+  String get usageDown => 'Téléchargement';
+
+  @override
+  String get usageUp => 'Envoi';
+
+  @override
+  String get usageVpn => 'Trafic VPN';
+
+  @override
+  String get usageDirect => 'Trafic direct';
+
+  @override
+  String get usageReset => 'Réinitialiser la consommation';
+
+  @override
+  String get usageResetTitle => 'Réinitialiser la consommation';
+
+  @override
+  String get usageResetBody =>
+      'Les statistiques de consommation de tous les jours seront effacées. Cette action est irréversible.';
+
+  @override
+  String get usageResetConfirm => 'Réinitialiser';
+
+  @override
+  String get usageTotal => 'Total';
+
+  @override
+  String get usageAll => 'Tout';
+
+  @override
+  String get usageWeek => '7 derniers jours';
+
+  @override
+  String get usageMonth => '30 derniers jours';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'Page $page sur $pages';
+  }
+
+  @override
+  String get usageNewer => 'Jours plus récents';
+
+  @override
+  String get usageOlder => 'Jours plus anciens';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '$done sur $total testés';
+  }
+
+  @override
+  String get stopDelayTest => 'Arrêter';
+
+  @override
   String testedAgo(String ago) {
     return 'Testé $ago';
   }
@@ -1084,7 +1152,7 @@ class AppLocalizationsFr extends AppLocalizations {
   String get showAppModeSwitch => 'Changement rapide de mode VPN';
 
   @override
-  String get liveTraffic => 'Trafic en direct';
+  String get liveTraffic => 'Débit actuel';
 
   @override
   String get totalTraffic => 'Trafic total';

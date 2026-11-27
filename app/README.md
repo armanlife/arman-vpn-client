@@ -136,9 +136,10 @@ an app sees a refusal as a reset just after it connected; refused UDP is
 dropped without a word, so an app's QUIC falls back to TCP after a moment.
 Settings, Routing, "Apps and the VPN" chooses which apps use it: all but
 the checked ones, or only the checked ones. In the first mode the apps
-on the routing region's list (hiddify/Android-GFW-Apps, GPL-3.0, so the
-core downloads it with the routing lists rather than the app shipping it)
-are left out too unless unchecked. The service follows Android's default
+on the routing region's list (arman-org/android-direct-apps, kept by hand
+there with each app's names, category, and stores; GPL-3.0, so the core
+downloads it with the routing lists rather than the app shipping it; Iran
+and Russia have one) are left out too unless unchecked. The service follows Android's default
 network (ConnectivityManager) and tells the core (`mobile.NetworkChanged`),
 which reconnects to Mozilla at once on a new network. When
 the proxy is shared with the LAN the home page shows the address other

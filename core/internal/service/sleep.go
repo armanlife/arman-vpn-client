@@ -151,7 +151,7 @@ func (d *Daemon) useController(e *proxyEngine, why wakeReason) (c *proxy.Control
 	d.mu.Unlock()
 	if err, wait := e.wakeWait(waitReason, time.Now()); err != nil {
 		at, _, _ := e.wakeFailure()
-		return nil, nil, fmt.Errorf("connecting to Mozilla failed %s ago; trying again in %s: %w", time.Since(at).Round(time.Second), wait.Round(time.Second), err)
+		return nil, nil, proxy.NotConnected(fmt.Errorf("connecting to Mozilla failed %s ago; trying again in %s: %w", time.Since(at).Round(time.Second), wait.Round(time.Second), err))
 	}
 	wake := func(e *proxyEngine) error { return d.wake(e, why) }
 	if d.wakeHook != nil {
@@ -242,7 +242,7 @@ func (d *Daemon) wake(e *proxyEngine, why wakeReason) error {
 			// The restarted engine reports the wait for an account.
 			d.RequestRestart()
 		}
-		return fmt.Errorf("connecting to Mozilla: %w", err)
+		return proxy.NotConnected(fmt.Errorf("connecting to Mozilla: %w", err))
 	}
 	if !d.runController(e, controller) {
 		return errProxyNotRunning
@@ -252,7 +252,8 @@ func (d *Daemon) wake(e *proxyEngine, why wakeReason) error {
 		logx.Info("proxy woke up for a connection account=%s took=%s", logx.Email(d.pool.ActiveName()), time.Since(started).Round(time.Millisecond))
 		return nil
 	}
-	logx.Info("proxy connected for its first use account=%s took=%s", logx.Email(d.pool.ActiveName()), time.Since(started).Round(time.Millisecond))
+	// The line "connected to Mozilla" (connectEngine) already says it.
+	logx.Debug("proxy connected for its first use account=%s took=%s", logx.Email(d.pool.ActiveName()), time.Since(started).Round(time.Millisecond))
 	if why != wakeForTest {
 		go d.autoTest(e, "proxy connected")
 	}
@@ -334,6 +335,10 @@ func (u *engineUpstream) OpenTunnel(authority string) (net.Conn, error) {
 
 func (u *engineUpstream) OpenTunnelForClient(authority, clientKey string) (net.Conn, error) {
 	c, release, err := u.d.useController(u.engine, wakeForClient)
+	if errors.Is(err, errProxyNotRunning) {
+		// The proxy is restarting or off: said once where it happened.
+		return nil, proxy.NotConnected(err)
+	}
 	if err != nil {
 		return nil, err
 	}

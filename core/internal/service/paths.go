@@ -23,6 +23,8 @@ const (
 	routingDirName    = "routing"
 	sessionKeyName    = "dashboard.key"
 	serverListName    = "servers.json"
+	usageFileName     = "usage.json"
+	edgesFileName     = "edges.json"
 )
 
 type DataPaths struct {
@@ -41,6 +43,10 @@ type DataPaths struct {
 	// ServerList keeps the last server list fetched from Mozilla, for
 	// when the next fetch fails and to show the locations at once.
 	ServerList string
+	// Usage keeps the data used each day (usage.go).
+	Usage string
+	// Edges keeps the spare edges the last scan found (edges.go).
+	Edges string
 }
 
 // ResolveDataPaths returns the data folder (next to the executable unless
@@ -71,6 +77,8 @@ func ResolveDataPaths(override string) (DataPaths, error) {
 		RoutingDir: filepath.Join(dir, routingDirName),
 		SessionKey: filepath.Join(dir, sessionKeyName),
 		ServerList: filepath.Join(dir, serverListName),
+		Usage:      filepath.Join(dir, usageFileName),
+		Edges:      filepath.Join(dir, edgesFileName),
 	}, nil
 }
 

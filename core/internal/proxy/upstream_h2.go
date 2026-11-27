@@ -81,7 +81,7 @@ func newH2ProxySession(proxyURL *url.URL, token string, timeout time.Duration) (
 	if err != nil {
 		return nil, err
 	}
-	logx.Info("upstream HTTP/2 session established proxy=%s", session.proxyHost)
+	logx.Debug("upstream HTTP/2 session established proxy=%s", session.proxyHost)
 	return session, nil
 }
 

@@ -23,7 +23,7 @@ inputs:
   ref:
     description: The profile's version, a tag in its repository.
     required: false
-    default: v0.4.3
+    default: v0.4.4
 
 outputs:
   enabled:

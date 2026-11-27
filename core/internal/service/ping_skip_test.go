@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ func TestSlowLocationsAreSkippedForAWhile(t *testing.T) {
 
 	figures := map[string]int64{"NL": 80, "US": 300, "JP": 0} // JP answers nothing
 	var measured []string
-	pingLocations = func(_ context.Context, targets []proxy.Candidate, _ string) []proxy.LocationPing {
+	pingLocations = func(_ context.Context, targets []proxy.Candidate, _ string, _ func(proxy.LocationPing)) []proxy.LocationPing {
 		measured = measured[:0]
 		var out []proxy.LocationPing
 		for _, c := range targets {
@@ -45,11 +46,11 @@ func TestSlowLocationsAreSkippedForAWhile(t *testing.T) {
 	d := &Daemon{countries: []serverlist.Country{pingCountry("NL"), pingCountry("US"), pingCountry("JP")}}
 	ctx := context.Background()
 
-	if _, _ = d.measureLocations(ctx, "token", nil, false); len(measured) != 3 {
+	if _, _ = d.measureLocations(ctx, "token", nil, false, PingProgress{}); len(measured) != 3 {
 		t.Fatalf("first measurement covered %v; want all three", measured)
 	}
 
-	results, _ := d.measureLocations(ctx, "token", nil, false)
+	results, _ := d.measureLocations(ctx, "token", nil, false, PingProgress{})
 	if len(measured) != 1 || measured[0] != "NL" {
 		t.Fatalf("second measurement covered %v; want only the quick NL", measured)
 	}
@@ -66,7 +67,7 @@ func TestSlowLocationsAreSkippedForAWhile(t *testing.T) {
 	}
 
 	// A person pressing the button gets every location measured.
-	if _, _ = d.measureLocations(ctx, "token", nil, true); len(measured) != 3 {
+	if _, _ = d.measureLocations(ctx, "token", nil, true, PingProgress{}); len(measured) != 3 {
 		t.Fatalf("a fresh measurement covered %v; want all three", measured)
 	}
 
@@ -74,14 +75,47 @@ func TestSlowLocationsAreSkippedForAWhile(t *testing.T) {
 	for code := range d.pingSkip {
 		d.pingSkip[code] = time.Now().Add(-time.Second)
 	}
-	if _, _ = d.measureLocations(ctx, "token", nil, false); len(measured) != 3 {
+	if _, _ = d.measureLocations(ctx, "token", nil, false, PingProgress{}); len(measured) != 3 {
 		t.Fatalf("after the skip ran out, measured %v; want all three", measured)
 	}
 
 	// Another network measures everything again at once.
-	_, _ = d.measureLocations(ctx, "token", nil, false) // US and JP skipped again
+	_, _ = d.measureLocations(ctx, "token", nil, false, PingProgress{}) // US and JP skipped again
 	network = "office"
-	if _, _ = d.measureLocations(ctx, "token", nil, false); len(measured) != 3 {
+	if _, _ = d.measureLocations(ctx, "token", nil, false, PingProgress{}); len(measured) != 3 {
 		t.Fatalf("on another network, measured %v; want all three", measured)
+	}
+}
+
+// The locations that answered fastest last time are measured first, and a
+// follower hears the order and each location as it comes.
+func TestMeasurementStartsWithLastFastestAndReportsProgress(t *testing.T) {
+	oldNetwork, oldPing := networkNow, pingLocations
+	t.Cleanup(func() { networkNow, pingLocations = oldNetwork, oldPing })
+	networkNow = func() (string, bool) { return "home", true }
+	pingLocations = func(_ context.Context, targets []proxy.Candidate, _ string, update func(proxy.LocationPing)) []proxy.LocationPing {
+		var out []proxy.LocationPing
+		for _, c := range targets {
+			p := proxy.LocationPing{Code: c.CountryCode, PingMS: 50}
+			update(p)
+			out = append(out, p)
+		}
+		return out
+	}
+	d := &Daemon{
+		countries: []serverlist.Country{pingCountry("NL"), pingCountry("US"), pingCountry("JP"), pingCountry("DE")},
+		pings:     []proxy.LocationPing{{Code: "JP", PingMS: 40}, {Code: "US", PingMS: 90}, {Code: "NL", Error: "timeout"}},
+	}
+	var started []string
+	var updated []string
+	d.measureLocations(context.Background(), "token", nil, true, PingProgress{
+		Start:  func(codes []string) { started = codes },
+		Update: func(p proxy.LocationPing) { updated = append(updated, p.Code) },
+	})
+	if got := strings.Join(started, ","); got != "JP,US,NL,DE" {
+		t.Fatalf("order = %s; want the last fastest first, then the server list's order", got)
+	}
+	if got := strings.Join(updated, ","); got != "JP,US,NL,DE" {
+		t.Fatalf("updates = %s", got)
 	}
 }

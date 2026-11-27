@@ -91,8 +91,8 @@ func (s *systemProxySync) update(st *service.TrayStatus) {
 }
 
 // watch looks, every takenCheck, whether another program replaced this
-// program's setting: VPN and proxy programs such as v2rayN, Clash, or
-// Hiddify set the system proxy when they connect, and may clear it when
+// program's setting: VPN and proxy programs such as v2rayN or Clash set
+// the system proxy when they connect, and may clear it when
 // they quit. It tells the service, and takes the setting back only when the
 // user asks (system_proxy_retake), never by itself: two programs that each
 // take it back would switch it every few seconds.

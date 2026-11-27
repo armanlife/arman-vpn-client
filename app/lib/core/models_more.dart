@@ -77,6 +77,98 @@ class LocationList {
   final DateTime? pingedAt;
 }
 
+/// One record of a streamed real-delay test (`POST /api/locations/ping`
+/// with `stream`): the locations about to be measured, one location's
+/// result, or the whole result last.
+class PingEvent {
+  PingEvent.fromJson(Map<String, Object?> j)
+    : type = _str(j['type']),
+      codes = [
+        for (final c in (j['codes'] as List<Object?>? ?? const [])) _str(c),
+      ],
+      location = j['location'] is Map<String, Object?>
+          ? Location.fromJson(_map(j['location']))
+          : null,
+      result = j['result'] is Map<String, Object?>
+          ? LocationList.fromJson(_map(j['result']))
+          : null,
+      error = _str(j['error']);
+
+  /// `start`, `location`, `result`, or `error`.
+  final String type;
+
+  /// For `start`: the codes measured, in the order they are taken.
+  final List<String> codes;
+  final Location? location;
+
+  final LocationList? result;
+  final String error;
+}
+
+/// What was sent (up) and received (down).
+class UsageBytes {
+  const UsageBytes(this.up, this.down);
+
+  UsageBytes.fromJson(Map<String, Object?> j)
+    : up = _int(j['up']),
+      down = _int(j['down']);
+
+  final int up;
+  final int down;
+
+  int get total => up + down;
+
+  UsageBytes operator +(UsageBytes o) => UsageBytes(up + o.up, down + o.down);
+}
+
+/// A use through the VPN and directly (the routing rules).
+class UsageCounts {
+  const UsageCounts(this.vpn, this.direct);
+
+  UsageCounts.fromJson(Map<String, Object?> j)
+    : vpn = UsageBytes.fromJson(_map(j['vpn'])),
+      direct = UsageBytes.fromJson(_map(j['direct']));
+
+  /// The sum of [all].
+  factory UsageCounts.sum(Iterable<UsageCounts> all) {
+    var vpn = const UsageBytes(0, 0), direct = const UsageBytes(0, 0);
+    for (final c in all) {
+      vpn += c.vpn;
+      direct += c.direct;
+    }
+    return UsageCounts(vpn, direct);
+  }
+
+  final UsageBytes vpn;
+  final UsageBytes direct;
+
+  /// Both together.
+  UsageBytes get all => vpn + direct;
+}
+
+/// One day's data use, in the computer's or phone's local time.
+class UsageDay {
+  UsageDay.fromJson(Map<String, Object?> j)
+    : date = DateTime.tryParse(_str(j['date'])),
+      counts = UsageCounts.fromJson(j);
+
+  /// The day (midnight, local); null when unreadable.
+  final DateTime? date;
+  final UsageCounts counts;
+}
+
+/// The data used (`GET /api/usage`): every day counted since the last
+/// reset, newest first.
+class DataUsage {
+  DataUsage.fromJson(Map<String, Object?> j)
+    : days = [
+        for (final d in (j['days'] as List<Object?>? ?? const []))
+          UsageDay.fromJson(_map(d)),
+      ];
+
+  final List<UsageDay> days;
+}
+
 /// A line of the core's log (`GET /api/logs`).
 class LogEntry {
   LogEntry.fromJson(Map<String, Object?> j)

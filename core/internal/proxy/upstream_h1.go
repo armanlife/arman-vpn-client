@@ -70,7 +70,7 @@ func newH1ProxySession(proxyURL *url.URL, token string, timeout time.Duration) (
 	}
 	s.spare, s.spareAt = conn, time.Now()
 	s.alive.Store(true)
-	logx.Info("upstream HTTP/1.1 connection established proxy=%s", proxyHost)
+	logx.Debug("upstream HTTP/1.1 connection established proxy=%s", proxyHost)
 	return s, nil
 }
 

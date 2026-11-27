@@ -3,8 +3,7 @@
 # core, and publishes them as a GitHub release, each file twice: under a
 # fixed name, which the README's releases/latest/download links fetch, and
 # with the version in its name (Arman-VPN-1.2.3-Android-arm64-v8a.apk),
-# which the release notes and older installed apps use during the update
-# manifest transition. "Run workflow" builds without
+# which older installed apps use during the update manifest transition. "Run workflow" builds without
 # publishing. The same tag publishes the container image
 # (.github/workflows/docker.yml): the Linux core, not the desktop app.
 #
@@ -41,7 +40,7 @@ concurrency:
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
-  FLUTTER_VERSION: 3.50.0
+  FLUTTER_VERSION: 3.50.1
   GOMOBILE_VERSION: v0.0.0-20260908204917-8b95e45f8d3e
 
 jobs:
@@ -543,13 +542,14 @@ jobs:
             exit 1
           fi
           go run ./tools/sign ../release/SHA256SUMS.txt
-      # The notes are the README's download table only, linking to this
-      # release's files.
+      # The notes are the README's download table only, linking to the
+      # newest release's files (releases/latest/download), so an old
+      # release's table also fetches the newest.
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          bash scripts/release-notes.sh "$GITHUB_REF_NAME" > notes.md
+          bash scripts/release-notes.sh > notes.md
           gh release create "$GITHUB_REF_NAME" release/* \
             --repo "$GITHUB_REPOSITORY" \
             --title "Arman VPN ${{ needs.test.outputs.version }}" \

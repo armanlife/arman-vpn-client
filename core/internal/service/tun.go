@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"net"
 	"path"
 	"runtime"
@@ -181,14 +182,22 @@ func (d *Daemon) TunWanted() bool {
 // reports it.
 func (d *Daemon) SetTunStatus(s TunStatus) {
 	d.tun.mu.Lock()
-	changed := d.tun.status == nil || *d.tun.status != s
+	// The first report of a TUN that is off says nothing.
+	changed := d.tun.status != nil && *d.tun.status != s || d.tun.status == nil && s.State != TunOff
 	d.tun.status = &s
 	if s.State != TunOn {
 		d.tun.refusedUDP, d.tun.refusedUDPPath = "", ""
 	}
 	d.tun.mu.Unlock()
 	if changed {
-		logx.Info("TUN state=%s code=%s message=%q", s.State, s.Code, s.Message)
+		detail := ""
+		if s.Code != "" {
+			detail += " code=" + s.Code
+		}
+		if s.Message != "" {
+			detail += fmt.Sprintf(" message=%q", s.Message)
+		}
+		logx.Info("TUN state=%s%s", s.State, detail)
 	}
 }
 

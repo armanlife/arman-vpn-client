@@ -232,7 +232,10 @@ func RunApp(paths service.DataPaths, verbose bool) error {
 					sync.run(ctx)
 				}
 			}()
-			sysproxy.follow(ctx, func() (service.TrayStatus, error) { return pollStatus(client) }, appPollInterval)
+			// The status is read from the service in this process, not
+			// through its API: the same view, without a request every
+			// interval.
+			sysproxy.follow(ctx, func() (service.TrayStatus, error) { return daemonTrayStatus(d) }, appPollInterval)
 			<-tunDone
 		},
 		cleanup)

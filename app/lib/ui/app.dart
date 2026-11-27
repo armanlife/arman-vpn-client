@@ -353,34 +353,120 @@ class _ShellState extends State<Shell> {
   );
 }
 
-/// The side menu's traffic: the speed now and the total since the core
-/// started, through Mozilla, up and down.
-class _TrafficPanel extends StatelessWidget {
+/// The side menu's traffic, in one card: the speed now, over a line of
+/// the last minute's, then the total since the core started; down in
+/// [downloadColor], up in [uploadColor], each named, with a dot of its color.
+class _TrafficPanel extends StatefulWidget {
   const _TrafficPanel({required this.traffic});
 
   final Traffic? traffic;
 
   @override
+  State<_TrafficPanel> createState() => _TrafficPanelState();
+}
+
+class _TrafficPanelState extends State<_TrafficPanel> {
+  /// The speeds kept for the line, oldest first: about a minute at the
+  /// status's pace.
+  static const samples = 30;
+
+  final _down = <int>[];
+  final _up = <int>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _note(widget.traffic);
+  }
+
+  @override
+  void didUpdateWidget(_TrafficPanel old) {
+    super.didUpdateWidget(old);
+    // A new status brings new figures; a rebuild for anything else does not.
+    if (!identical(old.traffic, widget.traffic)) _note(widget.traffic);
+  }
+
+  void _note(Traffic? t) {
+    if (t == null) return;
+    _down.add(t.downRate);
+    _up.add(t.upRate);
+    if (_down.length > samples) {
+      _down.removeAt(0);
+      _up.removeAt(0);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
-    final t = traffic;
+    final theme = Theme.of(context);
+    final t = widget.traffic;
+    const down = downloadColor;
+    final title = theme.textTheme.labelSmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w600,
+    );
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-      child: SizedBox(
+      child: Container(
         width: 166,
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.5,
+          ),
+          borderRadius: BorderRadius.circular(14),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _TrafficCard(
-              title: l.liveTraffic,
-              up: formatRate(t?.upRate ?? 0),
-              down: formatRate(t?.downRate ?? 0),
+            Text(l.liveTraffic, style: title),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 32,
+              width: double.infinity,
+              child: CustomPaint(
+                painter: _SpeedLine(
+                  down: List.of(_down),
+                  up: List.of(_up),
+                  samples: samples,
+                  downColor: down,
+                  upColor: uploadColor,
+                  baseline: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.6,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(height: 8),
-            _TrafficCard(
-              title: l.totalTraffic,
-              up: formatBytes(t?.up ?? 0),
-              down: formatBytes(t?.down ?? 0),
+            _TrafficFigure(
+              label: l.usageDown,
+              color: down,
+              text: formatRate(t?.downRate ?? 0),
+            ),
+            const SizedBox(height: 4),
+            _TrafficFigure(
+              label: l.usageUp,
+              color: uploadColor,
+              text: formatRate(t?.upRate ?? 0),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Divider(height: 1),
+            ),
+            Text(l.totalTraffic, style: title),
+            const SizedBox(height: 6),
+            _TrafficFigure(
+              label: l.usageDown,
+              color: down,
+              text: formatBytes(t?.down ?? 0),
+            ),
+            const SizedBox(height: 4),
+            _TrafficFigure(
+              label: l.usageUp,
+              color: uploadColor,
+              text: formatBytes(t?.up ?? 0),
             ),
           ],
         ),
@@ -389,47 +475,156 @@ class _TrafficPanel extends StatelessWidget {
   }
 }
 
-class _TrafficCard extends StatelessWidget {
-  const _TrafficCard({
-    required this.title,
-    required this.up,
-    required this.down,
+/// A figure under its name, download or upload, with a small dot of the
+/// color of its line in the chart.
+class _TrafficFigure extends StatelessWidget {
+  const _TrafficFigure({
+    required this.label,
+    required this.color,
+    required this.text,
   });
 
-  final String title;
-  final String up;
-  final String down;
+  final String label;
+  final Color color;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final value = theme.textTheme.bodySmall?.copyWith(
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
-    Widget line(IconData icon, Color color, String text) => Row(
+    return Row(
       children: [
-        Icon(icon, size: 14, color: color),
-        const Spacer(),
-        Text(text, style: value),
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        // The figure always shows whole; a long name gives way.
+        Expanded(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: theme.textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.w600,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
       ],
     );
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: theme.textTheme.labelMedium),
-          const SizedBox(height: 4),
-          line(Icons.arrow_upward_rounded, StatusColors.good, up),
-          line(Icons.arrow_downward_rounded, theme.colorScheme.primary, down),
-        ],
-      ),
+  }
+}
+
+/// The last minute's speeds: download as a soft filled curve, upload as a
+/// thin line over it, newest on the right, both on one scale.
+class _SpeedLine extends CustomPainter {
+  _SpeedLine({
+    required this.down,
+    required this.up,
+    required this.samples,
+    required this.downColor,
+    required this.upColor,
+    required this.baseline,
+  });
+
+  final List<int> down;
+  final List<int> up;
+  final int samples;
+  final Color downColor;
+  final Color upColor;
+  final Color baseline;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final floor = size.height - 0.5;
+    canvas.drawLine(
+      Offset(0, floor),
+      Offset(size.width, floor),
+      Paint()
+        ..color = baseline
+        ..strokeWidth = 1,
     );
+    var top = 0;
+    for (final v in [...down, ...up]) {
+      if (v > top) top = v;
+    }
+    if (down.length < 2 || top == 0) return;
+    final step = size.width / (samples - 1);
+    List<Offset> points(List<int> values) => [
+      for (var i = 0; i < values.length; i++)
+        Offset(
+          size.width - step * (values.length - 1 - i),
+          floor - (size.height - 3) * values[i] / top,
+        ),
+    ];
+    // Through the midpoints, so the line bends rather than breaks.
+    Path curve(List<Offset> pts) {
+      final path = Path()..moveTo(pts.first.dx, pts.first.dy);
+      for (var i = 1; i < pts.length; i++) {
+        final mid = (pts[i - 1] + pts[i]) / 2;
+        path.quadraticBezierTo(pts[i - 1].dx, pts[i - 1].dy, mid.dx, mid.dy);
+      }
+      return path..lineTo(pts.last.dx, pts.last.dy);
+    }
+
+    final downPts = points(down);
+    final downLine = curve(downPts);
+    final area = Path.from(downLine)
+      ..lineTo(downPts.last.dx, floor)
+      ..lineTo(downPts.first.dx, floor)
+      ..close();
+    canvas.drawPath(
+      area,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            downColor.withValues(alpha: 0.25),
+            downColor.withValues(alpha: 0),
+          ],
+        ).createShader(Offset.zero & size),
+    );
+    final stroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    canvas.drawPath(
+      downLine,
+      stroke
+        ..color = downColor
+        ..strokeWidth = 1.6,
+    );
+    canvas.drawPath(
+      curve(points(up)),
+      stroke
+        ..color = upColor.withValues(alpha: 0.85)
+        ..strokeWidth = 1.3,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SpeedLine old) =>
+      old.downColor != downColor ||
+      old.upColor != upColor ||
+      old.baseline != baseline ||
+      !_same(old.down, down) ||
+      !_same(old.up, up);
+
+  static bool _same(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 }
 

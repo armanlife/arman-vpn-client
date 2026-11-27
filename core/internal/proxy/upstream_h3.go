@@ -154,7 +154,7 @@ func newH3ProxySession(proxyURL *url.URL, token string, timeout time.Duration) (
 		_ = udpConn.Close()
 		return nil, errProxyHTTP3Unavailable
 	}
-	logx.Info("upstream HTTP/3 session established proxy=%s remote=%s", proxyHost, conn.RemoteAddr())
+	logx.Debug("upstream HTTP/3 session established proxy=%s remote=%s", proxyHost, conn.RemoteAddr())
 
 	rt := &http3.Transport{
 		Dial: func(_ context.Context, addr string, tlsCfg *tls.Config, cfg *quic.Config) (*quic.Conn, error) {

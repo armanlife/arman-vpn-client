@@ -270,7 +270,13 @@ func (o *RoutedOpener) openPush(authority, clientKey string) (conn net.Conn, ok 
 	conn, err := dial(ctx, "tcp", authority)
 	if err != nil {
 		o.pushViaMozillaUntil.Store(time.Now().Add(pushThroughMozillaFor).UnixNano())
-		logx.Info("Google's push server could not be reached directly; notifications go through Mozilla for %s target=%s err=%s", pushThroughMozillaFor, logx.Target(authority), logx.Err(err))
+		// Once a run is enough: the network does not change its mind
+		// every ten minutes.
+		logPush := logx.Debug
+		if pushViaMozillaLogged.CompareAndSwap(false, true) {
+			logPush = logx.Info
+		}
+		logPush("Google's push server could not be reached directly; notifications go through Mozilla for %s at a time target=%s err=%s", pushThroughMozillaFor, logx.Target(authority), logx.Err(err))
 		return nil, false
 	}
 	o.direct.Add(1)
@@ -335,3 +341,7 @@ func (o *RoutedOpener) OpenTunnelForClient(authority, clientKey string) (net.Con
 	}
 	return countRouted(conn, &o.meter.up, &o.meter.down, RouteVPN), nil
 }
+
+// pushViaMozillaLogged is set once the push server's being unreachable was
+// logged at Info.
+var pushViaMozillaLogged atomic.Bool

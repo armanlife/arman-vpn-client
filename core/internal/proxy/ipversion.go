@@ -104,6 +104,11 @@ func dialUpstream(ctx context.Context, address string) (net.Conn, error) {
 	if resolver.UpstreamProxy() != "" {
 		return resolver.Dial(ctx, "tcp", address)
 	}
+	if at, ok := edgeAddress(address); ok {
+		// The custom edge in place of the server's own address.
+		logx.Debug("connecting to Mozilla's server through the custom edge proxy=%s edge=%s", address, at)
+		return resolver.Dial(ctx, "tcp", at)
+	}
 	steps := upstreamSteps()
 	var failed stepError
 	for i, step := range steps {
@@ -136,13 +141,42 @@ func dialUpstream(ctx context.Context, address string) (net.Conn, error) {
 // upstreamAddrs looks host up for a step: its IPv4 or IPv6 addresses, or
 // both interleaved.
 func upstreamAddrs(ctx context.Context, host, step string) ([]netip.Addr, error) {
+	if a, ok := customEdge(host); ok {
+		return []netip.Addr{a}, nil
+	}
+	var addrs []netip.Addr
+	var err error
 	switch step {
 	case stepIPv4:
-		return resolver.LookupNetIPFamily(ctx, host, "udp4")
+		addrs, err = resolver.LookupNetIPFamily(ctx, host, "udp4")
 	case stepIPv6:
-		return resolver.LookupNetIPFamily(ctx, host, "udp6")
+		addrs, err = resolver.LookupNetIPFamily(ctx, host, "udp6")
+	default:
+		addrs, err = resolver.LookupNetIPBoth(ctx, host)
 	}
-	return resolver.LookupNetIPBoth(ctx, host)
+	// A recommended server's spare addresses after its own (HTTP/3 tries
+	// them in turn).
+	for _, a := range spareEdgesFor(host) {
+		if step == stepIPv4 && !a.Is4() || step == stepIPv6 && !a.Is6() {
+			continue
+		}
+		if !containsAddr(addrs, a) {
+			addrs = append(addrs, a)
+		}
+	}
+	if len(addrs) > 0 {
+		err = nil
+	}
+	return addrs, err
+}
+
+func containsAddr(addrs []netip.Addr, a netip.Addr) bool {
+	for _, x := range addrs {
+		if x == a {
+			return true
+		}
+	}
+	return false
 }
 
 // noAddrsError is a step's lookup that found no address of its version.

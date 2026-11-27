@@ -61,11 +61,9 @@ class _AboutPageState extends State<AboutPage> {
     } on Exception catch (e) {
       // No connection, a timeout, or a refused handshake: say so in words,
       // not as the exception's text.
-      final network =
-          e is SocketException || e is TimeoutException || e is TlsException;
       if (mounted) {
         setState(
-          () => _result = network
+          () => _result = isNetworkError(e)
               ? l.updateCheckNoNetwork
               : l.updateCheckFailed('$e'),
         );

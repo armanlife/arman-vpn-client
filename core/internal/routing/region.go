@@ -6,7 +6,7 @@ import (
 )
 
 // Region codes for routing.region: the country whose sites and networks go
-// directly, like the "region" of v2ray clients such as Hiddify. NoRegion
+// directly, like the "region" of v2ray clients. NoRegion
 // keeps only private networks direct.
 const (
 	RegionIran        = "ir"

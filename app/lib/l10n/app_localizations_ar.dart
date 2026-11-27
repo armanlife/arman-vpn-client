@@ -702,6 +702,74 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noAnswer => 'لا استجابة';
 
   @override
+  String get dataUsage => 'استهلاك البيانات';
+
+  @override
+  String get usageToday => 'اليوم';
+
+  @override
+  String get usageYesterday => 'أمس';
+
+  @override
+  String get usageNone => 'لم يُستهلك شيء بعد.';
+
+  @override
+  String get usageDown => 'تنزيل';
+
+  @override
+  String get usageUp => 'رفع';
+
+  @override
+  String get usageVpn => 'حركة VPN';
+
+  @override
+  String get usageDirect => 'الحركة المباشرة';
+
+  @override
+  String get usageReset => 'تصفير استهلاك البيانات';
+
+  @override
+  String get usageResetTitle => 'تصفير استهلاك البيانات';
+
+  @override
+  String get usageResetBody =>
+      'سيتم حذف إحصاءات الاستهلاك لكل الأيام، ولا يمكن التراجع عن ذلك.';
+
+  @override
+  String get usageResetConfirm => 'تصفير';
+
+  @override
+  String get usageTotal => 'المجموع';
+
+  @override
+  String get usageAll => 'الكل';
+
+  @override
+  String get usageWeek => 'آخر 7 أيام';
+
+  @override
+  String get usageMonth => 'آخر 30 يومًا';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'الصفحة $page من $pages';
+  }
+
+  @override
+  String get usageNewer => 'أيام أحدث';
+
+  @override
+  String get usageOlder => 'أيام أقدم';
+
+  @override
+  String delayProgress(int done, int total) {
+    return 'تم اختبار $done من $total';
+  }
+
+  @override
+  String get stopDelayTest => 'إيقاف';
+
+  @override
   String testedAgo(String ago) {
     return 'اختُبر $ago';
   }
@@ -1079,7 +1147,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get showAppModeSwitch => 'تبديل سريع لوضع VPN';
 
   @override
-  String get liveTraffic => 'حركة البيانات الآن';
+  String get liveTraffic => 'السرعة الآن';
 
   @override
   String get totalTraffic => 'إجمالي البيانات';

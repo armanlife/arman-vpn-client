@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -259,5 +260,24 @@ func TestFirefoxHelloLive(t *testing.T) {
 		_ = conn.SetReadDeadline(time.Now().Add(time.Second))
 		_, _ = conn.Read(make([]byte, 1024))
 		_ = conn.Close()
+	}
+}
+
+// A failed handshake is counted for the one line that says how many failed;
+// one the caller gave up on, or another error, is not.
+func TestUpstreamHandshakeFailuresAreCounted(t *testing.T) {
+	TakeUpstreamHandshakeFailures()
+	failed := &upstreamHandshakeError{context.DeadlineExceeded}
+	noteHandshakeFailure(context.Background(), failed)
+	noteHandshakeFailure(context.Background(), failed)
+	noteHandshakeFailure(context.Background(), errors.New("no route"))
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	noteHandshakeFailure(cancelled, failed)
+	if n := TakeUpstreamHandshakeFailures(); n != 2 {
+		t.Fatalf("counted %d, want 2", n)
+	}
+	if n := TakeUpstreamHandshakeFailures(); n != 0 {
+		t.Fatalf("after taking: %d, want 0", n)
 	}
 }

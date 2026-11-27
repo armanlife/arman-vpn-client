@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/armanlife/arman-vpn-client/core/internal/controlplane"
@@ -152,11 +153,11 @@ func tryTokenRoutes(req *http.Request, routes []tokenAttempt, cache *tokenRouteC
 			if resp.StatusCode == http.StatusOK {
 				recordTokenRoute(req, cache, network, route.name)
 			}
-			// Which way the request got through, always: when the direct
-			// route answers after others failed, a log that says nothing
-			// leaves the reader to guess what carried it.
-			logx.Info("Guardian reached route=%s profile=%s (%s)",
-				route.name, evasion.Name(), strings.Join(outcomes, " "))
+			// Which way the request got through: when the direct route
+			// answers after others failed, a log that says nothing leaves
+			// the reader to guess what carried it. The same way as the last
+			// time, again and again (every pass renewal), says nothing new.
+			logRouteReached(route.name, evasion.Name(), strings.Join(outcomes, " "))
 			if directResp != nil {
 				directResp.Body.Close()
 			}
@@ -234,4 +235,19 @@ func dialTimedOut(err error) bool {
 
 func isFragmentRoute(name string) bool {
 	return slices.Contains(fragmentModes, name)
+}
+
+// lastRouteReached is the last Guardian route logged at Info, with how the
+// other routes fared.
+var lastRouteReached atomic.Value
+
+// logRouteReached logs the route a Guardian request got through: at Info
+// when it differs from the last one logged, at Debug when it is the same.
+func logRouteReached(route, profile, outcomes string) {
+	key := route + "|" + profile + "|" + outcomes
+	if last, _ := lastRouteReached.Swap(key).(string); last == key {
+		logx.Debug("Guardian reached route=%s profile=%s (%s)", route, profile, outcomes)
+		return
+	}
+	logx.Info("Guardian reached route=%s profile=%s (%s)", route, profile, outcomes)
 }

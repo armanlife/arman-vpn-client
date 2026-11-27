@@ -27,10 +27,11 @@ const (
 
 	pingSessionTimeout = 12 * time.Second
 
-	pingParallel = 8
-
 	pingTotalLimit = 2 * time.Minute
 )
+
+// pingParallel is how many locations are measured at once.
+var pingParallel = 8
 
 // LocationPing is the latency of one location: the time a CONNECT to
 // PingTarget takes through that location's proxy, on an already established
@@ -86,6 +87,8 @@ func TunnelMeter(token string) pingMeter {
 		if err != nil {
 			return 0, err
 		}
+		// Its spare addresses are tried when its own does not answer.
+		noteRecommended(proxyURL, target.IsRecommended())
 		session, err := pingSessionDialer(proxyURL, token, pingSessionTimeout)
 		if err != nil {
 			return 0, err
@@ -120,14 +123,23 @@ func TunnelMeter(token string) pingMeter {
 	}
 }
 
-// PingLocations measures every target concurrently and returns the results
-// sorted by latency, failed locations last.
-func PingLocations(ctx context.Context, targets []Candidate, meter pingMeter) []LocationPing {
+// PingRun says how PingLocations measures.
+type PingRun struct {
+	Meter pingMeter
+	// OnUpdate, when set, hears each location's result as soon as it is
+	// known; one call at a time.
+	OnUpdate func(LocationPing)
+}
+
+// PingLocations measures the targets, several at a time and starting them
+// in the given order, and returns the results sorted by latency, failed
+// locations last. Each location is measured once: a location without an
+// answer is not tried again, since the network itself may have failed for a
+// moment; the user tests again when it is back.
+func PingLocations(ctx context.Context, targets []Candidate, run PingRun) []LocationPing {
 	ctx, cancel := context.WithTimeout(ctx, pingTotalLimit)
 	defer cancel()
 	results := make([]LocationPing, len(targets))
-	limit := make(chan struct{}, pingParallel)
-	var wg sync.WaitGroup
 	for i, target := range targets {
 		results[i] = LocationPing{
 			Code:        strings.ToUpper(target.CountryCode),
@@ -136,28 +148,42 @@ func PingLocations(ctx context.Context, targets []Candidate, meter pingMeter) []
 			Server:      target.Addr,
 			Recommended: target.IsRecommended(),
 		}
-		wg.Add(1)
-		go func(i int, target Candidate) {
-			defer wg.Done()
-			select {
-			case limit <- struct{}{}:
-			case <-ctx.Done():
-				results[i].Error = "timeout"
-				return
-			}
-			defer func() { <-limit }()
-			latency, err := meter(ctx, target)
-			if err != nil {
-				results[i].Error = pingErrorText(err)
-				return
-			}
-			results[i].PingMS = max(1, latency.Milliseconds())
-		}(i, target)
 	}
+	var updateMu sync.Mutex
+	next := make(chan int)
+	var wg sync.WaitGroup
+	for range min(pingParallel, len(targets)) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range next {
+				if ctx.Err() != nil {
+					results[i].Error = pingErrorText(errPingNotStarted)
+				} else if latency, err := run.Meter(ctx, targets[i]); err != nil {
+					results[i].Error = pingErrorText(err)
+				} else {
+					results[i].PingMS = max(1, latency.Milliseconds())
+				}
+				if run.OnUpdate != nil {
+					updateMu.Lock()
+					run.OnUpdate(results[i])
+					updateMu.Unlock()
+				}
+			}
+		}()
+	}
+	for i := range targets {
+		next <- i
+	}
+	close(next)
 	wg.Wait()
 	sortPings(results)
 	return results
 }
+
+// errPingNotStarted marks a location the measurement ran out of time for
+// before it started it.
+var errPingNotStarted = fmt.Errorf("not measured in time: %w", context.DeadlineExceeded)
 
 func sortPings(results []LocationPing) {
 	sort.SliceStable(results, func(i, j int) bool {

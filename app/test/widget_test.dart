@@ -18,6 +18,7 @@ import 'package:arman_vpn/core/android_core.dart';
 import 'package:arman_vpn/desktop/close_dialog.dart';
 import 'package:arman_vpn/l10n/app_localizations.dart';
 import 'package:arman_vpn/ui/app.dart';
+import 'package:arman_vpn/ui/format.dart' show ltr;
 import 'package:arman_vpn/ui/settings_page.dart'
     show SettingsGroup, pickProgramFile;
 import 'package:arman_vpn/ui/signin_dialog.dart';
@@ -251,16 +252,94 @@ class FakeApi implements CoreApi {
   @override
   Future<void> setLocation(String country) async => location = country;
 
+  /// The data usage was reset.
+  bool usageReset = false;
+
+  @override
+  Future<DataUsage> resetUsage() async {
+    usageReset = true;
+    return usage();
+  }
+
+  @override
+  Future<DataUsage> usage() async {
+    if (usageReset) return DataUsage.fromJson({'days': []});
+    String day(int ago) => DateTime.now()
+        .subtract(Duration(days: ago))
+        .toIso8601String()
+        .substring(0, 10);
+    return DataUsage.fromJson({
+      'days': [
+        {
+          'date': day(0),
+          'vpn': {'up': 2 * 1024 * 1024, 'down': 300 * 1024 * 1024},
+          'direct': {'up': 1024, 'down': 5 * 1024 * 1024},
+        },
+        {
+          'date': day(3),
+          'vpn': {'up': 0, 'down': 1024 * 1024 * 1024},
+          'direct': {'up': 0, 'down': 0},
+        },
+        // Twelve days in all: two pages.
+        for (var ago = 4; ago < 14; ago++)
+          {
+            'date': day(ago),
+            'vpn': {'up': 0, 'down': 7 * 1024},
+            'direct': {'up': 0, 'down': 0},
+          },
+      ],
+    });
+  }
+
   /// Delay measurements asked for.
   int pings = 0;
 
+  /// When set, a delay test sends what this sends, as it sends it.
+  StreamController<PingEvent>? liveEvents;
+
   @override
-  Future<LocationList> pingLocations(
+  Stream<PingEvent> pingLocationsLive(
     List<String> codes, {
     bool fresh = false,
-  }) async {
+  }) async* {
     pings++;
-    return locations();
+    if (liveEvents case final live?) {
+      yield* live.stream;
+      return;
+    }
+    final list = await locations();
+    yield PingEvent.fromJson({
+      'type': 'start',
+      'codes': [for (final l in list.locations) l.code],
+    });
+    for (final l in list.locations) {
+      yield PingEvent.fromJson({
+        'type': 'location',
+        'location': {
+          'code': l.code,
+          'name': l.name,
+          'ping_ms': l.pingMs,
+          'error': l.pingError,
+        },
+      });
+    }
+    yield PingEvent.fromJson({
+      'type': 'result',
+      'result': {
+        'locations': [
+          for (final l in list.locations)
+            {
+              'code': l.code,
+              'name': l.name,
+              'city': l.city,
+              'recommended': l.recommended,
+              'ping_ms': l.pingMs,
+              'error': l.pingError,
+            },
+        ],
+        'pinged_at': '2026-11-25T12:00:00Z',
+      },
+    });
   }
 
   /// The proxy's connections, in the order they started; clearing keeps
@@ -397,6 +476,12 @@ void stillMotion(WidgetTester tester) {
       const FakeAccessibilityFeatures(disableAnimations: true);
   addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
 }
+
+/// A button, of any kind, showing [text]; not the same words elsewhere.
+Finder button(String text) => find.ancestor(
+  of: find.text(text),
+  matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+);
 
 void main() {
   _connectingRingTests();
@@ -1222,6 +1307,102 @@ void main() {
     core.dispose();
   });
 
+  testWidgets('a delay test shows each result and slides its row there', (
+    tester,
+  ) async {
+    stillMotion(tester);
+    tester.view.physicalSize = const Size(1200, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final live = StreamController<PingEvent>();
+    final api = FakeApi()..liveEvents = live;
+    final core = CoreController(
+      () async => api,
+      pollInterval: const Duration(hours: 1),
+    );
+    await tester.pumpWidget(VpnApp(core: core, settings: AppSettings()));
+    core.start();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Servers'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500)); // heights settle
+    expect(api.pings, 1);
+
+    // Rows move as a person sees them from here on.
+    tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
+    live.add(
+      PingEvent.fromJson({
+        'type': 'start',
+        'codes': ['NL', 'DE', 'JP'],
+      }),
+    );
+    await tester.pump();
+    expect(find.text('0 of 3 tested'), findsOneWidget);
+    expect(find.text('Stop'), findsOneWidget);
+    double top(String name) => tester.getTopLeft(find.text(name)).dy;
+    final first = top('Netherlands'), second = top('Germany');
+    expect(first, lessThan(second));
+
+    // Germany answers faster than the Netherlands did: its row goes first,
+    // sliding from where it was, not jumping.
+    live.add(
+      PingEvent.fromJson({
+        'type': 'location',
+        'location': {
+          'code': 'DE',
+          'name': 'Germany',
+          'city': 'Frankfurt',
+          'ping_ms': 40,
+        },
+      }),
+    );
+    await tester.pump();
+    expect(find.text('40 ms'), findsOneWidget);
+    expect(find.text('1 of 3 tested'), findsOneWidget);
+    expect(top('Germany'), moreOrLessEquals(second, epsilon: 1));
+    await tester.pump(); // the slide starts
+    await tester.pump(const Duration(milliseconds: 275));
+    expect(top('Germany'), lessThan(second - 1));
+    expect(top('Germany'), greaterThan(first + 1));
+    await tester.pump(const Duration(milliseconds: 1200));
+    expect(top('Germany'), moreOrLessEquals(first, epsilon: 1));
+    expect(top('Netherlands'), moreOrLessEquals(second, epsilon: 1));
+
+    live.add(
+      PingEvent.fromJson({
+        'type': 'result',
+        'result': {
+          'locations': [
+            {
+              'code': 'DE',
+              'name': 'Germany',
+              'city': 'Frankfurt',
+              'ping_ms': 40,
+            },
+            {
+              'code': 'NL',
+              'name': 'Netherlands',
+              'city': 'Amsterdam',
+              'recommended': true,
+              'ping_ms': 180,
+            },
+            {'code': 'JP', 'name': 'Japan', 'error': 'timeout'},
+          ],
+        },
+      }),
+    );
+    await live.close();
+    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('Stop'), findsNothing);
+    expect(top('Germany'), lessThan(top('Netherlands')));
+
+    await tester.pumpWidget(const SizedBox());
+    core.dispose();
+  });
+
   testWidgets('lists servers by delay and uses one', (tester) async {
     stillMotion(tester);
     tester.view.physicalSize = const Size(1200, 900);
@@ -1263,6 +1444,86 @@ void main() {
     await tester.tap(find.text('Japan'));
     await tester.pumpAndSettle();
     expect(api.location, 'JP');
+
+    await tester.pumpWidget(const SizedBox());
+    core.dispose();
+  });
+
+  testWidgets('the data used: total, table of days, pages, reset', (
+    tester,
+  ) async {
+    stillMotion(tester);
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final api = FakeApi();
+    final core = CoreController(
+      () async => api,
+      pollInterval: const Duration(hours: 1),
+    );
+    await tester.pumpWidget(VpnApp(core: core, settings: AppSettings()));
+    core.start();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Data usage'));
+    await tester.pumpAndSettle();
+
+    // The total first, everything by default: download and upload in large
+    // figures, the VPN and direct parts together. Total twice: the card's
+    // title and the table's column.
+    expect(find.text('Total'), findsNWidgets(2));
+    expect(find.text(ltr('1.3 GB')), findsOneWidget);
+    expect(find.text(ltr('2.0 MB')), findsNWidgets(2));
+    expect(find.text('VPN traffic'), findsNothing);
+    // Then the table of days under its column names, newest first: a
+    // day's download, upload, and their total together. (Download and
+    // Upload twice more: the side menu's speed and total.)
+    expect(find.text('Download'), findsNWidgets(4));
+    expect(find.text('Upload'), findsNWidgets(4));
+    expect(find.text('Today'), findsOneWidget);
+    expect(find.text(ltr('305 MB')), findsOneWidget);
+    expect(find.text(ltr('307 MB')), findsOneWidget);
+    expect(find.text(ltr('1.0 GB')), findsNWidgets(2));
+    expect(find.text(ltr('7.0 KB')), findsNWidgets(16));
+    expect(find.text('Yesterday'), findsNothing);
+
+    // A tap on a day shows its VPN and direct parts.
+    expect(find.text(ltr('300 MB')), findsNothing);
+    await tester.tap(find.text('Today'));
+    await tester.pumpAndSettle();
+    expect(find.text('VPN traffic'), findsOneWidget);
+    expect(find.text('Direct traffic'), findsOneWidget);
+    expect(find.text(ltr('300 MB')), findsOneWidget);
+    expect(find.text(ltr('302 MB')), findsOneWidget);
+    expect(find.text(ltr('5.0 MB')), findsNWidgets(2));
+
+    // The last week: the sum of its days.
+    await tester.tap(find.text('Last 7 days'));
+    await tester.pumpAndSettle();
+
+    // Ten days to a page; the older ones on the next.
+    expect(find.text('Page 1 of 2'), findsOneWidget);
+    await tester.tap(find.byTooltip('Older days'));
+    await tester.pumpAndSettle();
+    expect(find.text('Page 2 of 2'), findsOneWidget);
+    expect(find.text('Today'), findsNothing);
+    expect(find.text(ltr('7.0 KB')), findsNWidgets(4));
+
+    // A reset, once confirmed, starts from zero.
+    await tester.tap(find.text('Reset data usage'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'All data usage history will be deleted. This cannot be undone.',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(FilledButton, 'Reset'));
+    await tester.pumpAndSettle();
+    expect(api.usageReset, isTrue);
+    expect(find.text('Nothing used yet.'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox());
     core.dispose();
@@ -1457,7 +1718,7 @@ void main() {
       'If Mozilla is blocked, Relay server, TLS fragmentation, '
       'Upstream proxy',
     );
-    expect(texts(2), 'App, Advanced, Logs');
+    expect(texts(2), 'App, Data usage, Logs, Advanced');
 
     // Logs, in the side menu too, open that same page.
     await tester.tap(
@@ -2578,7 +2839,13 @@ void main() {
     // Logs cleared stay cleared when the page opens again.
     await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Logs'));
+    await tester.scrollUntilVisible(
+      find.text('Logs'),
+      300,
+      scrollable: find
+          .ancestor(of: find.text('Network'), matching: find.byType(Scrollable))
+          .first,
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Logs'));
     await tester.pumpAndSettle();
@@ -3090,7 +3357,7 @@ void main() {
           find.widgetWithText(OutlinedButton, 'Check for updates'),
           findsOneWidget,
         );
-        expect(find.text('Download'), findsOneWidget);
+        expect(button('Download'), findsOneWidget);
         expect(
           Updates
               .announcements
@@ -3179,7 +3446,7 @@ void main() {
         found: const Release('9.9.9', page),
       );
       expect(find.text('Version 9.9.9 is available.'), findsOneWidget);
-      expect(find.text('Download'), findsOneWidget);
+      expect(button('Download'), findsOneWidget);
       expect(find.text('Update'), findsNothing);
       await done(tester, core);
     });

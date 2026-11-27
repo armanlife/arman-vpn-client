@@ -14,6 +14,7 @@ import (
 	"github.com/armanlife/arman-vpn-client/core/internal/firefoxtls"
 	"github.com/armanlife/arman-vpn-client/core/internal/hellosplit"
 	"github.com/armanlife/arman-vpn-client/core/internal/logx"
+	"github.com/armanlife/arman-vpn-client/core/internal/resolver"
 )
 
 var (
@@ -27,7 +28,16 @@ var (
 	// network or server that takes only Go's gets it without another failure
 	// on each new connection, until the program restarts.
 	upstreamGoTLS atomic.Bool
+
+	// upstreamHandshakeFailures counts the TLS handshakes with Mozilla's
+	// servers that failed both ways, so a slow connection says it in one
+	// line (TakeUpstreamHandshakeFailures) instead of one per server.
+	upstreamHandshakeFailures atomic.Int64
 )
+
+// TakeUpstreamHandshakeFailures returns how many TLS handshakes with
+// Mozilla's servers failed since the last call, and starts again from zero.
+func TakeUpstreamHandshakeFailures() int64 { return upstreamHandshakeFailures.Swap(0) }
 
 // firefoxHandshakeShare is how much of the time left the Firefox hello may
 // use, leaving the rest to Go's for a network that drops it silently.
@@ -116,9 +126,31 @@ type upstreamHandshakeError struct{ err error }
 func (e *upstreamHandshakeError) Error() string { return e.err.Error() }
 func (e *upstreamHandshakeError) Unwrap() error { return e.err }
 
-// upstreamHandshake connects to proxyHost and completes TLS with shake.
+// upstreamHandshake connects to proxyHost and completes TLS with shake; a
+// server that does not answer at its own address is tried at its spare ones
+// (withSpares).
 func upstreamHandshake(ctx context.Context, proxyHost, name string, shake func(context.Context, net.Conn, string) (net.Conn, error)) (net.Conn, *watchedConn, error) {
-	dialed, err := dialUpstream(ctx, proxyHost)
+	type connected struct {
+		conn net.Conn
+		raw  *watchedConn
+	}
+	c, err := withSpares(ctx, proxyHost, func(ctx context.Context, at string) (connected, error) {
+		conn, raw, err := handshakeAt(ctx, proxyHost, at, name, shake)
+		return connected{conn, raw}, err
+	}, func(c connected) { _ = c.conn.Close() })
+	return c.conn, c.raw, err
+}
+
+// handshakeAt connects to proxyHost, at the address at when one is given,
+// and completes TLS with shake for name.
+func handshakeAt(ctx context.Context, proxyHost, at, name string, shake func(context.Context, net.Conn, string) (net.Conn, error)) (net.Conn, *watchedConn, error) {
+	var dialed net.Conn
+	var err error
+	if at == "" {
+		dialed, err = dialUpstream(ctx, proxyHost)
+	} else {
+		dialed, err = resolver.Dial(ctx, "tcp", at)
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -146,7 +178,9 @@ func dialUpstreamTLSFor(ctx context.Context, proxyURL *url.URL, proxyHost, proto
 	name := proxyURL.Hostname()
 	goShake := goHandshakeFor(proto)
 	if upstreamGoTLS.Load() {
-		return upstreamHandshake(ctx, proxyHost, name, goShake)
+		conn, raw, err := upstreamHandshake(ctx, proxyHost, name, goShake)
+		noteHandshakeFailure(ctx, err)
+		return conn, raw, err
 	}
 	firstCtx, cancel := firefoxContext(ctx)
 	defer cancel()
@@ -155,10 +189,23 @@ func dialUpstreamTLSFor(ctx context.Context, proxyURL *url.URL, proxyHost, proto
 	if err == nil || ctx.Err() != nil || !errors.As(err, &failed) {
 		return conn, raw, err
 	}
-	logx.Warn("upstream TLS with Firefox's hello failed; trying Go's proxy=%s err=%s", proxyHost, logx.Err(err))
+	// Each server's failure is for a verbose log: on a network that drops
+	// the handshakes, every server tried would add a line. What counts is
+	// whether Go's hello then passes, said once.
+	logx.Debug("upstream TLS with Firefox's hello failed; trying Go's proxy=%s err=%s", proxyHost, logx.Err(err))
 	conn, raw, err = upstreamHandshake(ctx, proxyHost, name, goShake)
-	if err == nil {
-		upstreamGoTLS.Store(true)
+	if err == nil && upstreamGoTLS.CompareAndSwap(false, true) {
+		logx.Info("this network answers Go's TLS hello but not Firefox's; using Go's until the program restarts proxy=%s", proxyHost)
 	}
+	noteHandshakeFailure(ctx, err)
 	return conn, raw, err
+}
+
+// noteHandshakeFailure counts a failed handshake that was not given up by
+// the caller.
+func noteHandshakeFailure(ctx context.Context, err error) {
+	var failed *upstreamHandshakeError
+	if err != nil && ctx.Err() == nil && errors.As(err, &failed) {
+		upstreamHandshakeFailures.Add(1)
+	}
 }

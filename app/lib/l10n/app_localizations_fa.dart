@@ -698,6 +698,74 @@ class AppLocalizationsFa extends AppLocalizations {
   String get noAnswer => 'بی‌پاسخ';
 
   @override
+  String get dataUsage => 'مصرف داده';
+
+  @override
+  String get usageToday => 'امروز';
+
+  @override
+  String get usageYesterday => 'دیروز';
+
+  @override
+  String get usageNone => 'هنوز مصرفی ثبت نشده است.';
+
+  @override
+  String get usageDown => 'دانلود';
+
+  @override
+  String get usageUp => 'آپلود';
+
+  @override
+  String get usageVpn => 'ترافیک VPN';
+
+  @override
+  String get usageDirect => 'ترافیک مستقیم';
+
+  @override
+  String get usageReset => 'ریست مصرف داده';
+
+  @override
+  String get usageResetTitle => 'ریست مصرف داده';
+
+  @override
+  String get usageResetBody =>
+      'آمار مصرف همه روزها پاک می‌شود و قابل برگشت نیست.';
+
+  @override
+  String get usageResetConfirm => 'ریست';
+
+  @override
+  String get usageTotal => 'مجموع';
+
+  @override
+  String get usageAll => 'همه';
+
+  @override
+  String get usageWeek => '۷ روز اخیر';
+
+  @override
+  String get usageMonth => '۳۰ روز اخیر';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'صفحه $page از $pages';
+  }
+
+  @override
+  String get usageNewer => 'روزهای جدیدتر';
+
+  @override
+  String get usageOlder => 'روزهای قدیمی‌تر';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '$done از $total تست شد';
+  }
+
+  @override
+  String get stopDelayTest => 'توقف';
+
+  @override
   String testedAgo(String ago) {
     return 'تست‌شده $ago';
   }
@@ -1066,7 +1134,7 @@ class AppLocalizationsFa extends AppLocalizations {
   String get showAppModeSwitch => 'تغییر سریع حالت VPN';
 
   @override
-  String get liveTraffic => 'ترافیک لحظه‌ای';
+  String get liveTraffic => 'سرعت لحظه‌ای';
 
   @override
   String get totalTraffic => 'ترافیک کل';

@@ -39,6 +39,11 @@ class AppLogo extends StatelessWidget {
 }
 
 /// Status colors that read in both themes.
+/// Download and upload wherever traffic is shown: a cool teal and a warm
+/// olive, told apart at a glance and quiet beside the app's violet.
+const downloadColor = Color(0xFF00A3A8);
+const uploadColor = Color(0xFF9CAF00);
+
 abstract final class StatusColors {
   static const good = Color(0xFF22A06B);
   static const busy = Color(0xFFE2A400);

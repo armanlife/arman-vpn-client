@@ -15,6 +15,7 @@ import '../l10n/app_localizations.dart';
 import '../platform.dart';
 import 'bypass_apps_page.dart';
 import 'connection_mode.dart';
+import 'data_usage.dart';
 import 'format.dart';
 import 'port_dialog.dart';
 import 'relay_test_dialog.dart';
@@ -80,6 +81,7 @@ enum SettingsSection {
   fragment,
   dns,
   routing,
+  usage,
   tun,
   advanced,
 }
@@ -113,12 +115,16 @@ List<(String, List<SettingsEntry>)> settingsGroups(
       (SettingsSection.upstreamProxy, Icons.lan_outlined, l.upstreamProxy),
     ],
   ),
-  // The app's port and the web dashboard: computers only.
-  if (!Platform.isAndroid)
-    (
-      l.groupApp,
-      [(SettingsSection.advanced, Icons.build_outlined, l.sectionAdvanced)],
-    ),
+  (
+    l.groupApp,
+    [
+      (SettingsSection.usage, Icons.data_usage_rounded, l.dataUsage),
+      // The app's port and the web dashboard: computers only; last of all,
+      // after the logs the computer's list adds.
+      if (!Platform.isAndroid)
+        (SettingsSection.advanced, Icons.build_outlined, l.sectionAdvanced),
+    ],
+  ),
 ];
 
 /// Whether a setting the search found is on this platform at all. The
@@ -473,9 +479,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   for (final entry in entries)
                     if (matches(entry.$3)) entry,
                 ],
-                onOpenLogs != null &&
-                    entries.last.$1 == SettingsSection.advanced &&
-                    matches(l.navLogs),
+                onOpenLogs != null && title == l.groupApp && matches(l.navLogs),
               ),
           ].where((g) => g.$2.isNotEmpty || g.$3).toList();
           // The settings themselves, when something was typed: the name of
@@ -537,10 +541,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 SettingsGroup(
                   title: title,
                   tiles: [
+                    // Advanced last of all, after the logs.
                     for (final (section, icon, name) in entries)
-                      row(icon, name, () => setState(() => _open = section)),
+                      if (section != SettingsSection.advanced)
+                        row(icon, name, () => setState(() => _open = section)),
                     if (logs)
                       row(Icons.receipt_long_outlined, l.navLogs, onOpenLogs!),
+                    for (final (section, icon, name) in entries)
+                      if (section == SettingsSection.advanced)
+                        row(icon, name, () => setState(() => _open = section)),
                   ],
                 ),
               if (hits.isNotEmpty)
@@ -583,6 +592,8 @@ class _SettingsPageState extends State<SettingsPage> {
             if (!fixed) const SizedBox(height: 16),
             if (open == SettingsSection.general)
               _general(l, s)
+            else if (open == SettingsSection.usage)
+              _usage(l, s)
             else if (_config == null)
               const LinearProgressIndicator()
             else
@@ -724,6 +735,9 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     ),
   );
+
+  Widget _usage(AppLocalizations l, AppSettings s) =>
+      DataUsageView(core: _core);
 
   Widget _connection(AppLocalizations l) {
     final status = _core.status;
@@ -1793,7 +1807,7 @@ class _Choice<T> extends StatelessWidget {
   }
 }
 
-/// A setting as one row, as in Hiddify: its icon, its name with the
+/// A setting as one row: its icon, its name with the
 /// current value under it, and a switch (or nothing) at the end. A tap
 /// opens the choices, the port dialog, or the page it names.
 class _Row extends StatelessWidget {

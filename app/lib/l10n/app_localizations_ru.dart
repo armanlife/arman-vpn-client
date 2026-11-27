@@ -703,6 +703,74 @@ class AppLocalizationsRu extends AppLocalizations {
   String get noAnswer => 'Нет ответа';
 
   @override
+  String get dataUsage => 'Расход трафика';
+
+  @override
+  String get usageToday => 'Сегодня';
+
+  @override
+  String get usageYesterday => 'Вчера';
+
+  @override
+  String get usageNone => 'Пока ничего не израсходовано.';
+
+  @override
+  String get usageDown => 'Загрузка';
+
+  @override
+  String get usageUp => 'Отправка';
+
+  @override
+  String get usageVpn => 'Трафик VPN';
+
+  @override
+  String get usageDirect => 'Прямой трафик';
+
+  @override
+  String get usageReset => 'Сбросить расход трафика';
+
+  @override
+  String get usageResetTitle => 'Сбросить расход трафика';
+
+  @override
+  String get usageResetBody =>
+      'Статистика расхода за все дни будет удалена без возможности восстановления.';
+
+  @override
+  String get usageResetConfirm => 'Сбросить';
+
+  @override
+  String get usageTotal => 'Всего';
+
+  @override
+  String get usageAll => 'Всё время';
+
+  @override
+  String get usageWeek => '7 дней';
+
+  @override
+  String get usageMonth => '30 дней';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'Страница $page из $pages';
+  }
+
+  @override
+  String get usageNewer => 'Более новые дни';
+
+  @override
+  String get usageOlder => 'Более старые дни';
+
+  @override
+  String delayProgress(int done, int total) {
+    return 'Проверено $done из $total';
+  }
+
+  @override
+  String get stopDelayTest => 'Остановить';
+
+  @override
   String testedAgo(String ago) {
     return 'Проверено $ago';
   }
@@ -1078,7 +1146,7 @@ class AppLocalizationsRu extends AppLocalizations {
   String get showAppModeSwitch => 'Быстрое переключение режима VPN';
 
   @override
-  String get liveTraffic => 'Текущий трафик';
+  String get liveTraffic => 'Текущая скорость';
 
   @override
   String get totalTraffic => 'Всего трафика';

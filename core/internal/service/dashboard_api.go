@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -567,7 +568,11 @@ func (s *dashboardServer) handleLocations(w http.ResponseWriter, r *http.Request
 }
 
 // handleLocationPing measures every location's latency; the result is
-// sorted by latency and kept for GET /locations.
+// sorted by latency and kept for GET /locations. With stream it answers in
+// NDJSON as the measurement goes: {type: start, codes} with the locations
+// measured, in order; {type: location, location} for each one as its
+// result comes; and last {type: result, result} with what the plain answer holds. A client that
+// closes the connection stops the measurement.
 func (s *dashboardServer) handleLocationPing(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		// Codes limits the test to these locations (the dashboard's tab).
@@ -575,17 +580,53 @@ func (s *dashboardServer) handleLocationPing(w http.ResponseWriter, r *http.Requ
 		// Fresh measures every location, slow ones too: a person pressed
 		// the button. Without it a measurement the page starts by itself
 		// keeps the last figure of a location that was slow lately.
-		Fresh bool `json:"fresh"`
+		Fresh  bool `json:"fresh"`
+		Stream bool `json:"stream"`
 	}
 	if !readJSON(w, r, &in) {
 		return
 	}
-	pings, pingedAt, err := s.d.PingAll(r.Context(), in.Codes, in.Fresh)
-	if err != nil {
-		writeError(w, http.StatusConflict, err.Error())
-		return
+	ctx, cancel := context.WithCancel(r.Context())
+	defer cancel()
+	var (
+		progress PingProgress
+		started  bool
+	)
+	encoder := json.NewEncoder(w)
+	emit := func(v any) {
+		if !started {
+			w.Header().Set("Content-Type", "application/x-ndjson")
+			w.Header().Set("Cache-Control", "no-store")
+			started = true
+		}
+		if encoder.Encode(v) != nil {
+			cancel()
+			return
+		}
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"locations": pings, "pinged_at": pingedAt, "target": proxy.PingTarget})
+	if in.Stream {
+		progress.Start = func(codes []string) {
+			emit(map[string]any{"type": "start", "codes": codes})
+		}
+		progress.Update = func(p proxy.LocationPing) {
+			emit(map[string]any{"type": "location", "location": p})
+		}
+	}
+	pings, pingedAt, err := s.d.PingAll(ctx, in.Codes, in.Fresh, progress)
+	result := map[string]any{"locations": pings, "pinged_at": pingedAt, "target": proxy.PingTarget}
+	switch {
+	case err != nil && !started:
+		writeError(w, http.StatusConflict, err.Error())
+	case err != nil:
+		emit(map[string]any{"type": "error", "error": err.Error()})
+	case in.Stream:
+		emit(map[string]any{"type": "result", "result": result})
+	default:
+		writeJSON(w, http.StatusOK, result)
+	}
 }
 
 func (s *dashboardServer) handleConnectionTest(w http.ResponseWriter, r *http.Request) {
@@ -730,12 +771,28 @@ func (d *Daemon) runConnectionTest(engine *proxyEngine, controller *proxy.Contro
 		logx.Warn("connection test failed reason=%s err=%s", why, result.Error)
 		return result
 	}
-	logx.Info("connection test passed reason=%s total_ms=%d tunnel_ms=%d ipv4=%s ipv6=%s place=%q", why, result.TotalMS, result.TunnelMS, result.ExitIPv4, result.ExitIPv6, exit.Place())
+	// The app asks for a test as the proxy connects, right after the one
+	// the proxy runs itself: the same answer again is not logged twice.
+	logPass := logx.Info
+	if d.testPassRepeats(exit.Place(), time.Now()) {
+		logPass = logx.Debug
+	}
+	logPass("connection test passed reason=%s total_ms=%d tunnel_ms=%d ipv4=%s ipv6=%s place=%q", why, result.TotalMS, result.TunnelMS, result.ExitIPv4, result.ExitIPv6, exit.Place())
 	if selected, _ := engine.selection(); selected.CountryCode != "" && exit.CountryCode != "" && !strings.EqualFold(selected.CountryCode, exit.CountryCode) && !selected.IsRecommended() {
 		code := selected.CountryCode
 		logx.Warn("public IP country differs from the selected location configured_country_code=%s public_ip_country_code=%s", code, exit.CountryCode)
 	}
 	return result
+}
+
+// testPassRepeats notes a passed connection test at place and reports
+// whether one passed at the same place less than a minute before.
+func (d *Daemon) testPassRepeats(place string, now time.Time) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	repeats := place == d.testPassPlace && now.Sub(d.testPassAt) < time.Minute
+	d.testPassPlace, d.testPassAt = place, now
+	return repeats
 }
 
 // handleAppExit stops the proxy and ends the process hosting it (the tray).

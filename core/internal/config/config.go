@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -282,6 +283,11 @@ type Network struct {
 	// "off" (or empty: whole), "first-byte", "sni" (cut inside the name), or
 	// "record" (two TLS records, cut inside the name).
 	HelloSplit string `json:"hello_split"`
+	// Edge, when set, is the address Mozilla's servers are reached at in
+	// place of the ones their names resolve to: an IP, or a range (CIDR)
+	// from which each connection picks one. The server's name stays the TLS
+	// name and the certificate check (proxy.SetEdge).
+	Edge string `json:"edge,omitempty"`
 	// UpstreamProxy, when set, is the host:port of the user's own SOCKS5 proxy,
 	// such as a v2ray client on this device: every connection to Mozilla and to
 	// the control plane goes through it, with the names resolved there, for a
@@ -710,6 +716,13 @@ func (c Config) Validate() error {
 	}
 	if !hellosplit.Valid(c.Network.HelloSplit) {
 		return fmt.Errorf("network.hello_split: %q is not auto, off, sni, first-byte, or record", c.Network.HelloSplit)
+	}
+	if e := strings.TrimSpace(c.Network.Edge); e != "" {
+		if _, err := netip.ParsePrefix(e); err != nil {
+			if _, err := netip.ParseAddr(e); err != nil {
+				return fmt.Errorf("network.edge: %q is not an IP or a range such as 192.0.2.0/24", c.Network.Edge)
+			}
+		}
 	}
 	if err := ValidateUpstreamProxy(c.Network, c.Proxy.Listen); err != nil {
 		return fmt.Errorf("network.upstream_proxy: %w", err)

@@ -398,19 +398,89 @@ class CoreApi {
   Future<LocationList> locations() async =>
       LocationList.fromJson(await _json('GET', '/api/locations'));
 
-  /// Tests the real delay of [codes] (all when empty) through the tunnel;
-  /// the proxy must run (409 otherwise). It can take two minutes.
-  /// [fresh] measures every location: a person pressed the button. Without
-  /// it the core keeps the last figure of a location that was slow lately.
-  Future<LocationList> pingLocations(
+  /// The data used each day, through the VPN and directly, newest first.
+  Future<DataUsage> usage() async =>
+      DataUsage.fromJson(await _json('GET', '/api/usage'));
+
+  /// Forgets every day of the data usage; counting starts from zero.
+  Future<DataUsage> resetUsage() async =>
+      DataUsage.fromJson(await _json('DELETE', '/api/usage'));
+
+  /// Tests the real delay of [codes] (all when empty) through the tunnel
+  /// and reports it as it goes: the order, each location as its result
+  /// comes, and the result last. It can take two minutes. [fresh] measures
+  /// every location: a person pressed the button. Without it the core
+  /// keeps the last figure of a location that was slow lately. A separate
+  /// connection, so cancelling the subscription closes it, which stops the
+  /// test in the core.
+  Stream<PingEvent> pingLocationsLive(
     List<String> codes, {
     bool fresh = false,
-  }) async => LocationList.fromJson(
-    await _json('POST', '/api/locations/ping', {
-      'codes': codes,
-      'fresh': fresh,
-    }, _slowest),
-  );
+  }) {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 3)
+      ..findProxy = (_) => 'DIRECT';
+    late final StreamController<PingEvent> events;
+    var cancelled = false;
+    events = StreamController<PingEvent>(
+      onListen: () async {
+        try {
+          final req = await client
+              .postUrl(endpoint.baseUri.replace(path: '/api/locations/ping'))
+              .timeout(_normal);
+          req.headers.set('X-Local-Token', endpoint.token);
+          req.headers.contentType = ContentType.json;
+          req.write(
+            jsonEncode({'codes': codes, 'fresh': fresh, 'stream': true}),
+          );
+          final res = await req.close().timeout(_slow);
+          final lines = res
+              .transform(utf8.decoder)
+              .transform(const LineSplitter())
+              // The longest wait between two records: one location tried
+              // a second time, which gives up within a minute.
+              .timeout(_slow);
+          if (res.statusCode != 200) {
+            final body = await lines.join('\n');
+            String message = 'HTTP ${res.statusCode}';
+            try {
+              if (jsonDecode(body) case {'error': final String e}) message = e;
+            } on FormatException {
+              // Not JSON: the status says enough.
+            }
+            throw CoreApiException(res.statusCode, message);
+          }
+          await for (final line in lines) {
+            if (cancelled) break;
+            if (line.isEmpty) continue;
+            final event = jsonDecode(line);
+            if (event is Map<String, Object?>) {
+              events.add(PingEvent.fromJson(event));
+            }
+          }
+        } catch (error) {
+          if (!cancelled) {
+            events.addError(
+              error is CoreApiException
+                  ? error
+                  : const CoreApiException(
+                      0,
+                      'The delay test connection ended unexpectedly.',
+                    ),
+            );
+          }
+        } finally {
+          client.close(force: true);
+          if (!cancelled) unawaited(events.close());
+        }
+      },
+      onCancel: () {
+        cancelled = true;
+        client.close(force: true);
+      },
+    );
+    return events.stream;
+  }
 
   /// Chooses the location: a country code, `fastest`, or empty for the
   /// recommended one. The proxy restarts.

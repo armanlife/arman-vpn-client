@@ -48,10 +48,12 @@ type proxyEngine struct {
 	// tunSOCKS serves the TUN listener's connections (tun.go).
 	tunSOCKS  *proxy.SOCKSServer
 	transport string
-	// fellBackToH2 is set when HTTP/3 was configured but did not connect,
-	// so the engine uses HTTP/2 (connectEngine).
-	fellBackToH2 atomic.Bool
-	startedAt    time.Time
+	// lastController is the last controller the engine ran, kept after it
+	// sleeps: its transport, which may differ from proxy.transport when
+	// that did not connect (proxy.TransportOrder), is where the next wake
+	// starts. Nil before the first connection and after a network change.
+	lastController atomic.Pointer[proxy.Controller]
+	startedAt      time.Time
 	// selected and selectionSource are guarded by idle.mu: before the
 	// first wake they show the expected choice (expectedSelection), which
 	// the first wake replaces with the real one.
@@ -91,8 +93,7 @@ func (d *Daemon) startEngine() (*proxyEngine, error) {
 		upstream: proxy.ControllerConfig{
 			Guardian:   cfg.Network.GuardianEndpoint,
 			Timeout:    connectTimeout,
-			UseH3:      engineTransport(cfg) == "h3",
-			UseH1:      engineTransport(cfg) == "h1",
+			Transports: proxy.TransportOrder(engineTransport(cfg)),
 			Sessions:   cfg.Proxy.UpstreamConnections,
 			StatusFile: d.paths.Status,
 			Accounts:   d.pool,
@@ -251,17 +252,7 @@ func (d *Daemon) connectEngine(ctx context.Context, e *proxyEngine) (*proxy.Cont
 	withPass := upstream
 	withPass.Auth, withPass.Pass = auth, pass
 	controller, err := proxy.NewController(withPass)
-	if err != nil && ctx.Err() == nil && upstream.UseH3 {
-		// Networks that filter QUIC (UDP), as in Iran, often let the same
-		// server through over TCP: HTTP/2 for this engine instead.
-		logx.Warn("HTTP/3 did not connect; using HTTP/2 instead proxy=%s err=%s", selected.Addr, logx.Err(err))
-		upstream.UseH3, withPass.UseH3 = false, false
-		controller, err = proxy.NewController(withPass)
-		if err == nil {
-			e.fellBackToH2.Store(true)
-		}
-	}
-	if err != nil && ctx.Err() == nil && fallback != nil && !standIn && !e.upstream.UseH3 && selected.IsRecommended() {
+	if err != nil && ctx.Err() == nil && fallback != nil && !standIn && selected.IsRecommended() {
 		if next, ok := upstream.Failover.StandInAfterTimeout(fallback(), selected, err); ok {
 			if nextURL, urlErr := proxy.NormalizeURL(next.Addr); urlErr == nil {
 				logx.Info("recommended server timed out on first connect; trying a stand-in from=%s to=%s", selected.Addr, next.Addr)
@@ -298,10 +289,15 @@ func (d *Daemon) connectEngine(ctx context.Context, e *proxyEngine) (*proxy.Cont
 	e.selected, e.selectionSource = selected, selectionSource
 	e.idle.mu.Unlock()
 
-	logx.Info("connected to Mozilla upstream=%s account=%s proxy_pass_exp=%s transport=%s upstream_conns=%d",
-		selected.Addr, logx.Email(d.pool.ActiveName()), pass.ExpiresAt().Format(time.RFC3339), engineTransport(cfg), cfg.Proxy.UpstreamConnections)
-	logx.Info("upstream selected configured_country=%q configured_country_code=%s proxy=%s selection_source=%s upstream_session_establish_latency=%s",
-		selected.CountryNameOrUnknown(), selected.CountryCodeOrUnknown(), selected.Addr, selectionSource, time.Since(sessionStart).Round(time.Millisecond))
+	// Servers whose handshake failed before this one answered: one figure
+	// here rather than a line each.
+	failed := ""
+	if n := proxy.TakeUpstreamHandshakeFailures(); n > 0 {
+		failed = fmt.Sprintf(" failed_tls_handshakes=%d", n)
+	}
+	logx.Info("connected to Mozilla upstream=%s location=%s selection_source=%s transport=%s account=%s session_took=%s proxy_pass_exp=%s%s",
+		selected.Addr, selected.CountryCodeOrUnknown(), selectionSource, controller.Transport(), logx.Email(d.pool.ActiveName()),
+		time.Since(sessionStart).Round(time.Millisecond), pass.ExpiresAt().Format(time.RFC3339), failed)
 	return controller, nil
 }
 
@@ -324,6 +320,7 @@ func (d *Daemon) reconnectEngine(ctx context.Context, e *proxyEngine) (*proxy.Co
 	}
 	cfg := e.upstream
 	cfg.Auth, cfg.Pass = auth, pass
+	cfg.Transports = e.wakeTransports()
 	controller, err := proxy.NewController(cfg)
 	if err != nil {
 		if next, ok := cfg.Failover.Failed(cfg.Location, fallbackList(cfg.Fallback), cfg.Server, err); ok {
@@ -420,6 +417,7 @@ func (d *Daemon) runController(engine *proxyEngine, controller *proxy.Controller
 		return false
 	}
 	engine.controller = controller
+	engine.lastController.Store(controller)
 	engine.idle.sleeping = time.Time{}
 	engine.idle.wakeErr, engine.idle.wakeCode, engine.idle.wakeFailedAt = nil, "", time.Time{}
 	engine.idle.wakeRetryAt, engine.idle.wakeFailures, engine.idle.wakeLasting = time.Time{}, 0, false
@@ -556,10 +554,26 @@ func engineTransport(cfg config.Config) string {
 }
 
 // currentTransport is the transport the engine uses: proxy.transport, or
-// "h2" after HTTP/3 did not connect.
+// another when that did not connect.
 func (e *proxyEngine) currentTransport() string {
-	if e.fellBackToH2.Load() {
-		return "h2"
+	if c := e.lastController.Load(); c != nil {
+		return c.Transport()
 	}
 	return e.transport
+}
+
+// wakeTransports is the order the next wake tries: from the last
+// controller's transport, else proxy.transport's.
+func (e *proxyEngine) wakeTransports() []string {
+	if c := e.lastController.Load(); c != nil {
+		return c.Transports()
+	}
+	return proxy.TransportOrder(e.transport)
+}
+
+// resetTransport goes back to proxy.transport, on another network.
+func (e *proxyEngine) resetTransport() {
+	if c := e.lastController.Swap(nil); c != nil {
+		c.ResetTransport()
+	}
 }

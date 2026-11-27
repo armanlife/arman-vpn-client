@@ -57,6 +57,11 @@ DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+; Windows 10 1607 or later: the Go binaries require Windows 10 (on 8.1 they
+; fail with "not a valid Win32 application") and the app calls
+; GetDpiForWindow, which 1607 added. Older Windows gets Setup's own message
+; instead of an app that cannot start.
+MinVersion=10.0.14393
 OutputDir={#OutputDir}
 OutputBaseFilename={#OutputName}
 SetupIconFile=..\runner\resources\app_icon.ico

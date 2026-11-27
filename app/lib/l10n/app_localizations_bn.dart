@@ -701,6 +701,74 @@ class AppLocalizationsBn extends AppLocalizations {
   String get noAnswer => 'সাড়া নেই';
 
   @override
+  String get dataUsage => 'ডেটা ব্যবহার';
+
+  @override
+  String get usageToday => 'আজ';
+
+  @override
+  String get usageYesterday => 'গতকাল';
+
+  @override
+  String get usageNone => 'এখনও কিছু ব্যবহার হয়নি।';
+
+  @override
+  String get usageDown => 'ডাউনলোড';
+
+  @override
+  String get usageUp => 'আপলোড';
+
+  @override
+  String get usageVpn => 'VPN ট্রাফিক';
+
+  @override
+  String get usageDirect => 'সরাসরি ট্রাফিক';
+
+  @override
+  String get usageReset => 'ডেটা ব্যবহার রিসেট করুন';
+
+  @override
+  String get usageResetTitle => 'ডেটা ব্যবহার রিসেট করুন';
+
+  @override
+  String get usageResetBody =>
+      'সব দিনের ব্যবহারের হিসাব মুছে যাবে এবং তা ফিরিয়ে আনা যাবে না।';
+
+  @override
+  String get usageResetConfirm => 'রিসেট';
+
+  @override
+  String get usageTotal => 'মোট';
+
+  @override
+  String get usageAll => 'সব';
+
+  @override
+  String get usageWeek => 'শেষ ৭ দিন';
+
+  @override
+  String get usageMonth => 'শেষ ৩০ দিন';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'পৃষ্ঠা $page / $pages';
+  }
+
+  @override
+  String get usageNewer => 'নতুন দিনগুলো';
+
+  @override
+  String get usageOlder => 'পুরোনো দিনগুলো';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '$totalটির মধ্যে $doneটি পরীক্ষা হয়েছে';
+  }
+
+  @override
+  String get stopDelayTest => 'থামান';
+
+  @override
   String testedAgo(String ago) {
     return '$ago পরীক্ষা করা হয়েছে';
   }
@@ -1071,7 +1139,7 @@ class AppLocalizationsBn extends AppLocalizations {
   String get showAppModeSwitch => 'দ্রুত VPN মোড পরিবর্তন';
 
   @override
-  String get liveTraffic => 'লাইভ ট্রাফিক';
+  String get liveTraffic => 'বর্তমান গতি';
 
   @override
   String get totalTraffic => 'মোট ট্রাফিক';

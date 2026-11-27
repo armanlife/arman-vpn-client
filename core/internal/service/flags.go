@@ -92,7 +92,7 @@ func (d *Daemon) flag(code string) ([]byte, error) {
 			logx.Debug("saving a flag failed code=%s err=%s", code, logx.Err(err))
 		}
 	}
-	logx.Info("downloaded the flag of %s", strings.ToUpper(code))
+	logx.Debug("downloaded the flag of %s", strings.ToUpper(code))
 	return data, nil
 }
 

@@ -702,6 +702,74 @@ class AppLocalizationsVi extends AppLocalizations {
   String get noAnswer => 'Không phản hồi';
 
   @override
+  String get dataUsage => 'Dữ liệu đã dùng';
+
+  @override
+  String get usageToday => 'Hôm nay';
+
+  @override
+  String get usageYesterday => 'Hôm qua';
+
+  @override
+  String get usageNone => 'Chưa dùng gì.';
+
+  @override
+  String get usageDown => 'Tải xuống';
+
+  @override
+  String get usageUp => 'Tải lên';
+
+  @override
+  String get usageVpn => 'Lưu lượng VPN';
+
+  @override
+  String get usageDirect => 'Lưu lượng trực tiếp';
+
+  @override
+  String get usageReset => 'Đặt lại dữ liệu đã dùng';
+
+  @override
+  String get usageResetTitle => 'Đặt lại dữ liệu đã dùng';
+
+  @override
+  String get usageResetBody =>
+      'Thống kê dữ liệu đã dùng của tất cả các ngày sẽ bị xóa và không thể hoàn tác.';
+
+  @override
+  String get usageResetConfirm => 'Đặt lại';
+
+  @override
+  String get usageTotal => 'Tổng';
+
+  @override
+  String get usageAll => 'Tất cả';
+
+  @override
+  String get usageWeek => '7 ngày qua';
+
+  @override
+  String get usageMonth => '30 ngày qua';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'Trang $page/$pages';
+  }
+
+  @override
+  String get usageNewer => 'Những ngày gần hơn';
+
+  @override
+  String get usageOlder => 'Những ngày trước đó';
+
+  @override
+  String delayProgress(int done, int total) {
+    return 'Đã đo $done/$total';
+  }
+
+  @override
+  String get stopDelayTest => 'Dừng';
+
+  @override
   String testedAgo(String ago) {
     return 'Đã đo $ago';
   }
@@ -1073,7 +1141,7 @@ class AppLocalizationsVi extends AppLocalizations {
   String get showAppModeSwitch => 'Chuyển nhanh chế độ VPN';
 
   @override
-  String get liveTraffic => 'Lưu lượng hiện tại';
+  String get liveTraffic => 'Tốc độ hiện tại';
 
   @override
   String get totalTraffic => 'Tổng lưu lượng';

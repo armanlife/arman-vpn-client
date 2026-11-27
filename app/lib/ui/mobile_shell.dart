@@ -269,6 +269,7 @@ class _SettingsListState extends State<_SettingsList> {
       SettingsSection.connection,
       SettingsSection.routing,
       SettingsSection.dns,
+      SettingsSection.usage,
       SettingsSection.relay,
       SettingsSection.fragment,
       SettingsSection.upstreamProxy,
@@ -325,14 +326,11 @@ class _SettingsListState extends State<_SettingsList> {
           ),
         ]),
       ?group(l.groupApp, [
-          // The app's port and the web dashboard: computers only (a narrow
-          // window shows this layout too).
-          if (!Platform.isAndroid)
-            section(
-              SettingsSection.advanced,
-              Icons.build_outlined,
-              l.sectionAdvanced,
-            ),
+          section(
+            SettingsSection.usage,
+            Icons.data_usage_rounded,
+            l.dataUsage,
+          ),
           row(
             Icons.receipt_long_outlined,
             l.navLogs,
@@ -343,6 +341,14 @@ class _SettingsListState extends State<_SettingsList> {
             l.navAbout,
             () => push(l.navAbout, () => AboutPage(core: core)),
           ),
+          // The app's port and the web dashboard: computers only (a narrow
+          // window shows this layout too); last of all.
+          if (!Platform.isAndroid)
+            section(
+              SettingsSection.advanced,
+              Icons.build_outlined,
+              l.sectionAdvanced,
+            ),
         ]),
     ];
     return ListView(

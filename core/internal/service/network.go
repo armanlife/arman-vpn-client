@@ -19,6 +19,7 @@ import (
 	"github.com/armanlife/arman-vpn-client/core/internal/guardian"
 	"github.com/armanlife/arman-vpn-client/core/internal/hellosplit"
 	"github.com/armanlife/arman-vpn-client/core/internal/logx"
+	"github.com/armanlife/arman-vpn-client/core/internal/proxy"
 	"github.com/armanlife/arman-vpn-client/core/internal/resolver"
 )
 
@@ -66,6 +67,9 @@ func configureDNS(cfg config.DNS) error {
 // relay's name with Encrypted Client Hello (echDialer).
 func configureAPIRelay(n config.Network) error {
 	hellosplit.Set(n.HelloSplit)
+	if err := proxy.SetEdge(n.Edge); err != nil {
+		return fmt.Errorf("network.edge: %w", err)
+	}
 	proxyAddress := n.UpstreamProxyInUse()
 	if err := resolver.SetUpstreamProxy(proxyAddress, n.UpstreamProxyUsername, n.UpstreamProxyPassword); err != nil {
 		return err

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -22,13 +23,11 @@ const githubRepo = 'armanlife/arman-vpn-client';
 /// the one every installed app reads.
 const updateManifestUrl = String.fromEnvironment(
   'UPDATE_MANIFEST_URL',
-  defaultValue:
-      'https://raw.githubusercontent.com/arman-org/update-manifests/main/arman-vpn-client/updates.json',
+  defaultValue: 'https://raw.githubusercontent.com/arman-org/update-manifests/main/arman-vpn-client/updates.json',
 );
 const updateManifestMirror = String.fromEnvironment(
   'UPDATE_MANIFEST_MIRROR',
-  defaultValue:
-      'https://cdn.jsdelivr.net/gh/arman-org/update-manifests@main/arman-vpn-client/updates.json',
+  defaultValue: 'https://cdn.jsdelivr.net/gh/arman-org/update-manifests@main/arman-vpn-client/updates.json',
 );
 
 /// A release server used instead of GitHub, to try updates with a local
@@ -88,6 +87,9 @@ Future<Release?> checkForUpdate({
     ..connectionTimeout = const Duration(seconds: 15)
     ..findProxy = (_) =>
         proxy == null || srv.isNotEmpty ? 'DIRECT' : 'PROXY $proxy; DIRECT';
+  // A manifest that could not be fetched for want of a network, kept so
+  // that a failed check says so instead of only "unavailable".
+  final offline = <Exception>[];
   try {
     final system = os ?? Platform.operatingSystem;
     var metadata = await _updateMetadata(
@@ -98,6 +100,7 @@ Future<Release?> checkForUpdate({
       repo,
       check,
       current,
+      offline,
     );
     final mirror =
         updatesMirror ??
@@ -111,10 +114,12 @@ Future<Release?> checkForUpdate({
         repo,
         check,
         current,
+        offline,
       );
     }
     if (metadata == null) {
       if (system == 'android') {
+        if (offline.isNotEmpty) throw offline.last;
         throw const HttpException('Android update metadata is unavailable');
       }
       return await _latestRelease(client, srv, repo, current, system);
@@ -164,6 +169,7 @@ Future<({Release release, List<Announcement> announcements})?> _updateMetadata(
   String repo,
   UpdateCheck check,
   String current,
+  List<Exception> offline,
 ) async {
   try {
     final (status, body) = await _get(client, url);
@@ -197,10 +203,18 @@ Future<({Release release, List<Announcement> announcements})?> _updateMetadata(
       release: Release(version, '$base/releases/tag/v$version'),
       announcements: <Announcement>[],
     );
+  } on Exception catch (e) {
+    if (isNetworkError(e)) offline.add(e);
+    return null;
   } catch (_) {
     return null;
   }
 }
+
+/// Whether [e] is a missing network rather than a bad answer: no
+/// connection, a timeout, or a refused handshake.
+bool isNetworkError(Object e) =>
+    e is SocketException || e is TimeoutException || e is TlsException;
 
 /// The latest release on GitHub (GitHub's API), when newer than [current].
 Future<Release?> _latestRelease(

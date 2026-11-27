@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -37,9 +38,9 @@ type ControllerConfig struct {
 	Timeout  time.Duration
 	Auth     *runtimeAuth
 	Pass     *guardian.ProxyPassInfo
-	UseH3    bool
-	// UseH1 is proxy.transport "h1": a TLS connection per tunnel.
-	UseH1      bool
+	// Transports are the transports to try, the first first
+	// (TransportOrder); empty is HTTP/2 then HTTP/1.1.
+	Transports []string
 	Sessions   int
 	StatusFile string
 	Accounts   *AccountPool // optional; multi-account mode with threshold failover
@@ -118,24 +119,36 @@ type Controller struct {
 	redialBackoff rebuildBackoff
 	passBackoff   rebuildBackoff
 
+	// transports is the transport in use and the ones to try after it.
+	transports *transportState
+
 	closeOnce sync.Once
 	closeErr  error
 }
 
+// Transport is the transport the controller uses now (TransportH2, ...).
+func (c *Controller) Transport() string { return c.transports.current() }
+
+// Transports is the order a later controller tries, starting at the one in
+// use now.
+func (c *Controller) Transports() []string { return c.transports.fromCurrent() }
+
+// ResetTransport goes back to the user's transport for the next session:
+// on another network, it may connect again.
+func (c *Controller) ResetTransport() { c.transports.reset() }
+
 func NewController(cfg ControllerConfig) (*Controller, error) {
-	var baseFactory func(target *url.URL, token string) (proxySession, error)
-	if cfg.UseH3 {
-		baseFactory = func(target *url.URL, token string) (proxySession, error) {
+	// The custom and spare edges are for the recommended location's servers.
+	noteRecommended(cfg.ProxyURL, cfg.Server.IsRecommended())
+	transports := newTransportState(cfg.Transports)
+	baseFactory := func(target *url.URL, token string) (proxySession, error) {
+		switch transports.current() {
+		case TransportH3:
 			return newH3ProxySession(target, token, cfg.Timeout)
-		}
-	} else if cfg.UseH1 {
-		baseFactory = func(target *url.URL, token string) (proxySession, error) {
+		case TransportH1:
 			return newH1ProxySession(target, token, cfg.Timeout)
 		}
-	} else {
-		baseFactory = func(target *url.URL, token string) (proxySession, error) {
-			return newH2ProxySession(target, token, cfg.Timeout)
-		}
+		return newH2ProxySession(target, token, cfg.Timeout)
 	}
 	sessions := cfg.Sessions
 	if sessions < 1 {
@@ -162,6 +175,9 @@ func NewController(cfg ControllerConfig) (*Controller, error) {
 	}
 
 	session, err := factory(cfg.ProxyURL, cfg.Pass.RawToken)
+	for err != nil && transports.advance(err) {
+		session, err = factory(cfg.ProxyURL, cfg.Pass.RawToken)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -181,6 +197,7 @@ func NewController(cfg ControllerConfig) (*Controller, error) {
 		chosenLocation: cfg.ChosenLocation,
 		location:       cfg.Location,
 		failover:       cfg.Failover,
+		transports:     transports,
 		fallback:       cfg.Fallback,
 		quotaCheckNow:  make(chan struct{}, 1),
 		done:           make(chan struct{}),
@@ -247,6 +264,7 @@ func (c *Controller) openTunnel(authority, clientKey string) (net.Conn, error) {
 				c.redialBackoff.opened()
 				c.passBackoff.opened()
 				c.failover.Worked(ms.server)
+				c.transports.worked()
 				return &managedTunnelConn{
 					Conn:    conn,
 					release: release,
@@ -276,8 +294,10 @@ func (c *Controller) openTunnel(authority, clientKey string) (net.Conn, error) {
 		}
 
 		// Every tunnel open when a session dies fails at once: the first
-		// tells, the others would repeat it.
-		if c.firstToReport(failedSession) {
+		// tells, the others would repeat it. A session this program closed
+		// (after "upstream connection lost", or found unhealthy) was told
+		// already.
+		if c.firstToReport(failedSession) && !closedByUs(lastErr) {
 			logx.Warn("upstream tunnel open failed; rebuilding proxy session err=%s", logx.Err(lastErr))
 		} else {
 			logx.Debug("upstream tunnel open failed; rebuilding proxy session attempt=%d max=%d err=%s", attempt+1, maxOpenTunnelRebuildRetries, logx.Err(lastErr))
@@ -479,11 +499,20 @@ func (c *Controller) currentServer() Candidate {
 }
 
 // failOver counts err, a failure to open or keep a session on the server
-// from, against that server, and moves the controller to another server of
-// the location when the failover says so (ServerFailover.Failed). It
-// reports whether it moved. renewMu is held.
+// from, against the transport and then that server, and moves the
+// controller to the next transport (transportState.strike), else to
+// another server of the location when the failover says so
+// (ServerFailover.Failed). It reports whether it moved. renewMu is held.
 func (c *Controller) failOver(from Candidate, err error) bool {
-	if c.failover == nil || err == nil || c.isClosed() {
+	if err == nil || c.isClosed() {
+		return false
+	}
+	// Another transport is tried before another server.
+	if c.transports.strike(err) {
+		c.redialBackoff.reset()
+		return true
+	}
+	if c.failover == nil {
 		return false
 	}
 	var fallback []Candidate
@@ -703,4 +732,11 @@ func (c *managedTunnelConn) CloseWrite() error {
 		return closeWriter.CloseWrite()
 	}
 	return nil
+}
+
+// closedByUs reports whether err is a session this program closed or
+// found unhealthy itself, which was logged when it did.
+func closedByUs(err error) bool {
+	return errors.Is(err, errProxySessionUnhealthy) ||
+		err != nil && strings.Contains(err.Error(), "client connection force closed")
 }

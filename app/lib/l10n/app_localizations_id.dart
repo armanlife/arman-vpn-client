@@ -700,6 +700,74 @@ class AppLocalizationsId extends AppLocalizations {
   String get noAnswer => 'Tidak merespons';
 
   @override
+  String get dataUsage => 'Penggunaan data';
+
+  @override
+  String get usageToday => 'Hari ini';
+
+  @override
+  String get usageYesterday => 'Kemarin';
+
+  @override
+  String get usageNone => 'Belum ada yang digunakan.';
+
+  @override
+  String get usageDown => 'Unduh';
+
+  @override
+  String get usageUp => 'Unggah';
+
+  @override
+  String get usageVpn => 'Lalu lintas VPN';
+
+  @override
+  String get usageDirect => 'Lalu lintas langsung';
+
+  @override
+  String get usageReset => 'Atur ulang penggunaan data';
+
+  @override
+  String get usageResetTitle => 'Atur ulang penggunaan data';
+
+  @override
+  String get usageResetBody =>
+      'Statistik penggunaan semua hari akan dihapus dan tidak dapat dibatalkan.';
+
+  @override
+  String get usageResetConfirm => 'Atur ulang';
+
+  @override
+  String get usageTotal => 'Total';
+
+  @override
+  String get usageAll => 'Semua';
+
+  @override
+  String get usageWeek => '7 hari terakhir';
+
+  @override
+  String get usageMonth => '30 hari terakhir';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'Halaman $page dari $pages';
+  }
+
+  @override
+  String get usageNewer => 'Hari lebih baru';
+
+  @override
+  String get usageOlder => 'Hari lebih lama';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '$done dari $total diuji';
+  }
+
+  @override
+  String get stopDelayTest => 'Hentikan';
+
+  @override
   String testedAgo(String ago) {
     return 'Diuji $ago';
   }
@@ -1074,7 +1142,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get showAppModeSwitch => 'Ganti mode VPN dengan cepat';
 
   @override
-  String get liveTraffic => 'Lalu lintas langsung';
+  String get liveTraffic => 'Kecepatan saat ini';
 
   @override
   String get totalTraffic => 'Total lalu lintas';

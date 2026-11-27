@@ -706,6 +706,74 @@ class AppLocalizationsHu extends AppLocalizations {
   String get noAnswer => 'Nincs válasz';
 
   @override
+  String get dataUsage => 'Adathasználat';
+
+  @override
+  String get usageToday => 'Ma';
+
+  @override
+  String get usageYesterday => 'Tegnap';
+
+  @override
+  String get usageNone => 'Még nincs adathasználat.';
+
+  @override
+  String get usageDown => 'Letöltés';
+
+  @override
+  String get usageUp => 'Feltöltés';
+
+  @override
+  String get usageVpn => 'VPN-forgalom';
+
+  @override
+  String get usageDirect => 'Közvetlen forgalom';
+
+  @override
+  String get usageReset => 'Adathasználat nullázása';
+
+  @override
+  String get usageResetTitle => 'Adathasználat nullázása';
+
+  @override
+  String get usageResetBody =>
+      'Az összes nap használati adatai törlődnek, és ez nem vonható vissza.';
+
+  @override
+  String get usageResetConfirm => 'Nullázás';
+
+  @override
+  String get usageTotal => 'Összesen';
+
+  @override
+  String get usageAll => 'Mind';
+
+  @override
+  String get usageWeek => 'Utolsó 7 nap';
+
+  @override
+  String get usageMonth => 'Utolsó 30 nap';
+
+  @override
+  String usagePage(int page, int pages) {
+    return '$page. oldal / $pages';
+  }
+
+  @override
+  String get usageNewer => 'Újabb napok';
+
+  @override
+  String get usageOlder => 'Régebbi napok';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '$done/$total tesztelve';
+  }
+
+  @override
+  String get stopDelayTest => 'Leállítás';
+
+  @override
   String testedAgo(String ago) {
     return 'Tesztelve: $ago';
   }
@@ -1082,7 +1150,7 @@ class AppLocalizationsHu extends AppLocalizations {
   String get showAppModeSwitch => 'Gyors VPN-módváltás';
 
   @override
-  String get liveTraffic => 'Élő forgalom';
+  String get liveTraffic => 'Aktuális sebesség';
 
   @override
   String get totalTraffic => 'Teljes forgalom';

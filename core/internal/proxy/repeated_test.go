@@ -1,8 +1,11 @@
 package proxy
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -134,5 +137,52 @@ func TestConnectionLimitRefusalsAreCollapsed(t *testing.T) {
 	s.handleConn(server)
 	if reason, held := s.rejections.settled(); held != 0 || reason != "" {
 		t.Fatalf("an accepted client must close the account, still %q %d", reason, held)
+	}
+}
+
+// While the program cannot connect to Mozilla, the connections waiting on
+// it are not logged (that failure is, once, where it happens); a client
+// giving up is not either; another failure still is.
+func TestWaitingConnectionsAreNotLogged(t *testing.T) {
+	lines := captureLog(t)
+	client, _ := net.Pipe()
+	defer client.Close()
+	s := &SOCKSServer{Conns: &Connections{}}
+	for i, err := range []error{
+		NotConnected(errors.New("connecting to Mozilla failed 0s ago; trying again in 2s: timeout")),
+		NotConnected(errors.New("connecting to Mozilla failed 1s ago; trying again in 1s: timeout")),
+		fmt.Errorf("waiting: %w", context.Canceled),
+		fmt.Errorf("rebuilding upstream proxy session: %w for 9s: timeout", errRebuildCoolingDown),
+		ErrNoUsableSession,
+	} {
+		s.upstream = opener{err: err}
+		if _, got := s.openTarget(client, "a.com:443", fmt.Sprintf("127.0.0.1:%d", 5000+i), "socks5"); !errors.Is(got, err) {
+			t.Fatalf("err = %v, want %v", got, err)
+		}
+	}
+	if got := lines.String(); got != "" {
+		t.Fatalf("logged %q", got)
+	}
+	s.upstream = opener{err: errors.New("no route")}
+	_, _ = s.openTarget(client, "b.com:443", "127.0.0.1:5009", "socks5")
+	if got := lines.String(); !strings.Contains(got, "WARN") || !strings.Contains(got, "no route") {
+		t.Fatalf("logged %q, want the failure", got)
+	}
+}
+
+// A session this program closed or found unhealthy was told when it did.
+func TestClosedByUs(t *testing.T) {
+	for _, c := range []struct {
+		err  error
+		want bool
+	}{
+		{errors.New("http2: client connection force closed via ClientConn.Close"), true},
+		{fmt.Errorf("open: %w", errProxySessionUnhealthy), true},
+		{errors.New("dial tcp4 23.235.42.11:2499: i/o timeout"), false},
+		{nil, false},
+	} {
+		if got := closedByUs(c.err); got != c.want {
+			t.Fatalf("%v: %v", c.err, got)
+		}
 	}
 }

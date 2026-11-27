@@ -702,6 +702,74 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noAnswer => 'No answer';
 
   @override
+  String get dataUsage => 'Data usage';
+
+  @override
+  String get usageToday => 'Today';
+
+  @override
+  String get usageYesterday => 'Yesterday';
+
+  @override
+  String get usageNone => 'Nothing used yet.';
+
+  @override
+  String get usageDown => 'Download';
+
+  @override
+  String get usageUp => 'Upload';
+
+  @override
+  String get usageVpn => 'VPN traffic';
+
+  @override
+  String get usageDirect => 'Direct traffic';
+
+  @override
+  String get usageReset => 'Reset data usage';
+
+  @override
+  String get usageResetTitle => 'Reset data usage';
+
+  @override
+  String get usageResetBody =>
+      'All data usage history will be deleted. This cannot be undone.';
+
+  @override
+  String get usageResetConfirm => 'Reset';
+
+  @override
+  String get usageTotal => 'Total';
+
+  @override
+  String get usageAll => 'All';
+
+  @override
+  String get usageWeek => 'Last 7 days';
+
+  @override
+  String get usageMonth => 'Last 30 days';
+
+  @override
+  String usagePage(int page, int pages) {
+    return 'Page $page of $pages';
+  }
+
+  @override
+  String get usageNewer => 'Newer days';
+
+  @override
+  String get usageOlder => 'Older days';
+
+  @override
+  String delayProgress(int done, int total) {
+    return '$done of $total tested';
+  }
+
+  @override
+  String get stopDelayTest => 'Stop';
+
+  @override
   String testedAgo(String ago) {
     return 'Tested $ago';
   }
@@ -1076,7 +1144,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get showAppModeSwitch => 'Quick VPN mode switch';
 
   @override
-  String get liveTraffic => 'Live traffic';
+  String get liveTraffic => 'Current speed';
 
   @override
   String get totalTraffic => 'Total traffic';

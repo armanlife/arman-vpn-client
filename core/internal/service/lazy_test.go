@@ -374,10 +374,10 @@ func TestPingWhileOffUsesAPassOfItsOwn(t *testing.T) {
 	waitMessage(t, d, PhaseOff, "Proxy off")
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if _, _, err := d.PingAll(ctx, nil, false); err != nil {
+	if _, _, err := d.PingAll(ctx, nil, false, PingProgress{}); err != nil {
 		t.Fatalf("ping while off: %v", err)
 	}
-	if _, _, err := d.PingAll(ctx, nil, false); err != nil {
+	if _, _, err := d.PingAll(ctx, nil, false, PingProgress{}); err != nil {
 		t.Fatalf("second ping while off: %v", err)
 	}
 	if m := f.passes.Load(); m != 1 {
@@ -515,5 +515,47 @@ func TestFirstWakeTriesStandInWhenRecommendedServerTimesOut(t *testing.T) {
 	}
 	if persisted, ok := proxy.PersistedSelection(d.paths.Selection, ""); !ok || persisted.Addr != rec {
 		t.Fatalf("stand-in replaced the persisted choice: %+v", persisted)
+	}
+}
+
+// With stream, POST /api/locations/ping answers as the measurement goes:
+// the order, each location, and the result last.
+func TestLocationPingStreamsEachLocation(t *testing.T) {
+	d, _ := runLazyDaemon(t)
+	d.SetOn(false)
+	waitMessage(t, d, PhaseOff, "Proxy off")
+	oldPing := pingLocations
+	t.Cleanup(func() { pingLocations = oldPing })
+	pingLocations = func(_ context.Context, targets []proxy.Candidate, _ string, update func(proxy.LocationPing)) []proxy.LocationPing {
+		var out []proxy.LocationPing
+		for i, c := range targets {
+			p := proxy.LocationPing{Code: c.CountryCode, PingMS: int64(10 * (i + 1))}
+			update(p)
+			out = append(out, p)
+		}
+		return out
+	}
+	c := newDashboardClient(t, d)
+	response := c.do(http.MethodPost, "/api/locations/ping", map[string]any{"fresh": true, "stream": true})
+	if response.Code != http.StatusOK || response.Header().Get("Content-Type") != "application/x-ndjson" {
+		t.Fatalf("status %d, type %q", response.Code, response.Header().Get("Content-Type"))
+	}
+	var types []string
+	locations := 0
+	for _, line := range strings.Split(strings.TrimSpace(response.Body.String()), "\n") {
+		var event struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			t.Fatalf("line %q: %v", line, err)
+		}
+		if event.Type == "location" {
+			locations++
+			continue
+		}
+		types = append(types, event.Type)
+	}
+	if strings.Join(types, ",") != "start,result" || locations == 0 {
+		t.Fatalf("events %v with %d locations; want start, the locations, then result", types, locations)
 	}
 }

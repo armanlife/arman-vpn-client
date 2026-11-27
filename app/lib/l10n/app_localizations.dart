@@ -1311,6 +1311,132 @@ abstract class AppLocalizations {
   /// **'No answer'**
   String get noAnswer;
 
+  /// No description provided for @dataUsage.
+  ///
+  /// In en, this message translates to:
+  /// **'Data usage'**
+  String get dataUsage;
+
+  /// No description provided for @usageToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get usageToday;
+
+  /// No description provided for @usageYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get usageYesterday;
+
+  /// No description provided for @usageNone.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing used yet.'**
+  String get usageNone;
+
+  /// No description provided for @usageDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get usageDown;
+
+  /// No description provided for @usageUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload'**
+  String get usageUp;
+
+  /// No description provided for @usageVpn.
+  ///
+  /// In en, this message translates to:
+  /// **'VPN traffic'**
+  String get usageVpn;
+
+  /// No description provided for @usageDirect.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct traffic'**
+  String get usageDirect;
+
+  /// No description provided for @usageReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset data usage'**
+  String get usageReset;
+
+  /// No description provided for @usageResetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset data usage'**
+  String get usageResetTitle;
+
+  /// No description provided for @usageResetBody.
+  ///
+  /// In en, this message translates to:
+  /// **'All data usage history will be deleted. This cannot be undone.'**
+  String get usageResetBody;
+
+  /// No description provided for @usageResetConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset'**
+  String get usageResetConfirm;
+
+  /// No description provided for @usageTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get usageTotal;
+
+  /// No description provided for @usageAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get usageAll;
+
+  /// No description provided for @usageWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 7 days'**
+  String get usageWeek;
+
+  /// No description provided for @usageMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Last 30 days'**
+  String get usageMonth;
+
+  /// No description provided for @usagePage.
+  ///
+  /// In en, this message translates to:
+  /// **'Page {page} of {pages}'**
+  String usagePage(int page, int pages);
+
+  /// No description provided for @usageNewer.
+  ///
+  /// In en, this message translates to:
+  /// **'Newer days'**
+  String get usageNewer;
+
+  /// No description provided for @usageOlder.
+  ///
+  /// In en, this message translates to:
+  /// **'Older days'**
+  String get usageOlder;
+
+  /// No description provided for @delayProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{done} of {total} tested'**
+  String delayProgress(int done, int total);
+
+  /// No description provided for @stopDelayTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get stopDelayTest;
+
   /// No description provided for @testedAgo.
   ///
   /// In en, this message translates to:
@@ -1986,7 +2112,7 @@ abstract class AppLocalizations {
   /// No description provided for @liveTraffic.
   ///
   /// In en, this message translates to:
-  /// **'Live traffic'**
+  /// **'Current speed'**
   String get liveTraffic;
 
   /// No description provided for @totalTraffic.

@@ -7,7 +7,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -35,7 +37,7 @@ func TestPingLocationsSortsByLatencyAndReportsFailures(t *testing.T) {
 		}
 		return 0, &proxyConnectHTTPError{statusCode: http.StatusForbidden}
 	}
-	results := PingLocations(context.Background(), PingTargets(pingTestCountries()), meter)
+	results := PingLocations(context.Background(), PingTargets(pingTestCountries()), PingRun{Meter: meter})
 	var order []string
 	for _, r := range results {
 		order = append(order, r.Code)
@@ -168,4 +170,78 @@ func TestPingSubsetIsMergedIntoEarlierResults(t *testing.T) {
 	if strings.Join(got, ",") != "DE:40,US:90,JP:0,FR:0" {
 		t.Fatalf("merged = %v", got)
 	}
+}
+
+// Every location is measured once, a location without an answer too, and
+// each is reported as its result comes.
+func TestPingLocationsMeasuresOnceAndReportsEachLocation(t *testing.T) {
+	var tries sync.Map
+	meter := func(_ context.Context, target Candidate) (time.Duration, error) {
+		n, _ := tries.LoadOrStore(target.CountryCode, new(int))
+		*n.(*int)++
+		switch target.CountryCode {
+		case "US":
+			return 50 * time.Millisecond, nil
+		case "JP":
+			return 0, &proxyConnectHTTPError{statusCode: http.StatusForbidden}
+		}
+		return 0, context.DeadlineExceeded // DE and FR: no answer
+	}
+	var (
+		mu      sync.Mutex
+		updates []string
+	)
+	results := PingLocations(context.Background(), PingTargets(pingTestCountries()), PingRun{
+		Meter: meter,
+		OnUpdate: func(p LocationPing) {
+			mu.Lock()
+			defer mu.Unlock()
+			updates = append(updates, fmt.Sprintf("%s:%d:%s", p.Code, p.PingMS, p.Error))
+		},
+	})
+	for _, code := range []string{"US", "DE", "JP", "FR"} {
+		n, ok := tries.Load(code)
+		if !ok || *n.(*int) != 1 {
+			t.Fatalf("%s measured %v times, want once", code, n)
+		}
+	}
+	var got []string
+	for _, r := range results {
+		got = append(got, fmt.Sprintf("%s:%d:%s", r.Code, r.PingMS, r.Error))
+	}
+	if want := "US:50:,FR:0:timeout,DE:0:timeout,JP:0:not allowed for this account"; strings.Join(got, ",") != want {
+		t.Fatalf("results = %v, want %s", got, want)
+	}
+	sort.Strings(updates)
+	if want := "DE:0:timeout,FR:0:timeout,JP:0:not allowed for this account,US:50:"; strings.Join(updates, ",") != want {
+		t.Fatalf("updates = %v, want %s", updates, want)
+	}
+}
+
+// The first locations given are the first measured.
+func TestPingLocationsStartsInTheGivenOrder(t *testing.T) {
+	targets := PingTargets(pingTestCountries())
+	var (
+		mu    sync.Mutex
+		order []string
+	)
+	meter := func(_ context.Context, target Candidate) (time.Duration, error) {
+		mu.Lock()
+		order = append(order, target.CountryCode)
+		mu.Unlock()
+		return time.Millisecond, nil
+	}
+	old := pingParallelForTest(1)
+	defer pingParallelForTest(old)
+	PingLocations(context.Background(), targets, PingRun{Meter: meter})
+	if got := strings.Join(order, ","); got != "US,DE,JP,FR" {
+		t.Fatalf("order = %s", got)
+	}
+}
+
+// pingParallelForTest sets pingParallel and returns the old value.
+func pingParallelForTest(n int) int {
+	old := pingParallel
+	pingParallel = n
+	return old
 }

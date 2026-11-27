@@ -26,7 +26,7 @@ func TestAppListDownloadKeepsPackageNames(t *testing.T) {
 	var asked string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		asked = r.URL.Path
-		_, _ = w.Write([]byte("cab.snapp.passenger\n# a comment\n\ncom.digikala\nnot a package\n"))
+		_, _ = w.Write([]byte(`{"country":"ir","apps":["cab.snapp.passenger","not a package","com.digikala"]}`))
 	}))
 	defer srv.Close()
 	dir := t.TempDir()
@@ -37,7 +37,7 @@ func TestAppListDownloadKeepsPackageNames(t *testing.T) {
 	if err := DownloadAppList(context.Background(), client, dir, "ir"); err != nil {
 		t.Fatal(err)
 	}
-	if asked != "/hiddify/Android-GFW-Apps/master/direct_ir" {
+	if asked != "/arman-org/android-direct-apps/main/dist/ir.json" {
 		t.Fatalf("asked for %q", asked)
 	}
 	got := ReadAppList(dir, "ir")
@@ -63,8 +63,34 @@ func TestAppListRefusesAPageWithoutPackages(t *testing.T) {
 	}
 }
 
+// GitHub not answering, the list comes through jsDelivr.
+func TestAppListFallsBackToTheMirror(t *testing.T) {
+	var asked []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		asked = append(asked, r.URL.Path)
+		if !strings.HasPrefix(r.URL.Path, "/gh/") {
+			http.Error(w, "blocked", http.StatusForbidden)
+			return
+		}
+		_, _ = w.Write([]byte(`{"apps":["by.mtbank.Moby"]}`))
+	}))
+	defer srv.Close()
+	dir := t.TempDir()
+	if err := DownloadAppList(context.Background(), &http.Client{Transport: rewriteTo{srv}}, dir, "ru"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(asked, " ") != "/arman-org/android-direct-apps/main/dist/ru.json /gh/arman-org/android-direct-apps@main/dist/ru.json" {
+		t.Fatalf("asked %v", asked)
+	}
+	if got := ReadAppList(dir, "ru"); strings.Join(got, ",") != "by.mtbank.Moby" {
+		t.Fatalf("apps %v", got)
+	}
+}
+
 func TestRegionsWithoutAppList(t *testing.T) {
-	if HasAppList("tr") || AppListDue(t.TempDir(), "tr", time.Hour) || ReadAppList(t.TempDir(), "tr") != nil {
-		t.Fatal("tr has no app list")
+	for _, region := range []string{"tr", "cn"} {
+		if HasAppList(region) || AppListDue(t.TempDir(), region, time.Hour) || ReadAppList(t.TempDir(), region) != nil {
+			t.Fatalf("%s has no app list", region)
+		}
 	}
 }
